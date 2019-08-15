@@ -1,0 +1,116 @@
+//DO NOT MODIFY  My first procedure|ZPOLINA|||||||1
+	/*
+	 ORIG: 1 - 22/11/2014
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	   
+	   14/08/2019 - Polina Borisova 
+	
+	*/
+	
+	//do test
+	
+	quit
+	
+Avg
+	type Number AVG, BALAVL
+	
+	//type RecordDEP dep = Db.getRecord("DEP",CID,1)
+	//type ResultSet rs = Db.select("BALAVL","DEP","(ACN > 569)" & "(ACN < 580)")
+	
+	type ResultSet rs = Db.select("BALAVL","DEP","(ACN > 569) AND (ACN < 580)")
+	if rs.isEmpty() do {
+		write "no such record"
+	}
+	else do {
+		type Number LENGTH = 0
+		type Number TOTALBALAVL = 0
+		type Number COUNT = 0
+	
+		while rs.next() do {
+			set BALAVL = rs.getCol("BALAVL")
+			set COUNT = COUNT + 1
+			set TOTALBALAVL = TOTALBALAVL + BALAVL
+		}
+		
+		write "count = ", COUNT, !
+		write "total = ", TOTALBALAVL, !
+		write "average = "
+		write (TOTALBALAVL/COUNT), !
+		
+		//set ZAVG = ZAVGSUM/rs.length
+	}
+	
+	quit
+
+Check
+
+	//if 'dep.getMode() W !,"Error"
+	//else write "no error"
+	
+	type Number ZCID = 201000002019
+	type Number ZTSEQ = 14
+	
+	type RecordHIST testline = Db.getRecord("HIST","CID=:ZCID,TSEQ=:ZTSEQ",1)
+	
+	if 'testline.getMode() {
+		write "there is no such data"
+	}
+	
+	else do {
+		write "found a match:", !
+		write "CID = ", testline.cid, !
+		write "TSEQ = ", testline.tseq, !	
+		write "TSO = ", testline.tso	
+	}
+	
+	//write testline
+	
+	quit
+	
+RecordLine
+
+	type Number ZCID = 0
+	type Number ZTSEQ = 4
+	
+	/* %GTM-E-ZLINKFILE, Error while zlinking "RecordHISTREV",%GTM-E-FILENOTFND, File RecordHISTREV not found
+                At M source location RecordLine+6^ZPOLINA
+	
+	type RecordHISTREV histrev=Db.getRecord("HISTREV",":CID",1)
+	
+	set histrev.tseq = ZTSEQ
+	
+	//do histrev.setAuditFlag(1)
+	do histrev.save()
+	*/
+	
+	// UTBLMSG.115173 - Record Identifier ~p1 is not unique
+	//if zcifins.getMode() throw Class.new("Error","ZCIFINSLOAD-E-INVLVAL,"_$$^MSG(115173,"ZINSID="_ZINSID))
+	
+	//do zcifins.setAuditFlag(1)
+	//set zcifins.acn = ACN
+	
+	//type RecordHISTREV histrev = Db.getRecord("HISTREV","CID=:ZCID,TSEQ=:ZTSEQ")
+	//type RecordHISTREV histrev = Db.getRecord("HISTREV","CID=:ZCID",1)
+	
+	//do Db.insert("HISTREV","TSEQ","ZTSEQ")
+	
+	/*
+	if histrev.getMode() {
+		write "found a match"
+	}
+	else {
+		write "nothing found"
+	}
+ 	*/
+ 	
+	quit
+	
+	
+	
