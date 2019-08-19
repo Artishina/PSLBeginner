@@ -43,8 +43,6 @@ Avg
 		write "total = ", TOTALBALAVL, !
 		write "average = "
 		write (TOTALBALAVL/COUNT), !
-		
-		//set ZAVG = ZAVGSUM/rs.length
 	}
 	
 	quit
@@ -70,38 +68,31 @@ Check
 		write "TSO = ", testline.tso	
 	}
 	
-	//write testline
-	
 	quit
 	
-RecordLine
+Insert
 
 	type Number ZCID = 0
 	type Number ZTSEQ = 4
 	
-	/* %GTM-E-ZLINKFILE, Error while zlinking "RecordHISTREV",%GTM-E-FILENOTFND, File RecordHISTREV not found
-                At M source location RecordLine+6^ZPOLINA
-	
-	type RecordHISTREV histrev=Db.getRecord("HISTREV",":CID",1)
+	type RecordHISTREV histrev=Db.getRecord("HISTREV","CID=:ZCID,TSEQ=:ZTSEQ",1)
 	
 	set histrev.tseq = ZTSEQ
 	
-	//do histrev.setAuditFlag(1)
-	do histrev.save()
-	*/
-	
-	// UTBLMSG.115173 - Record Identifier ~p1 is not unique
-	//if zcifins.getMode() throw Class.new("Error","ZCIFINSLOAD-E-INVLVAL,"_$$^MSG(115173,"ZINSID="_ZINSID))
-	
-	//do zcifins.setAuditFlag(1)
-	//set zcifins.acn = ACN
-	
-	//type RecordHISTREV histrev = Db.getRecord("HISTREV","CID=:ZCID,TSEQ=:ZTSEQ")
-	//type RecordHISTREV histrev = Db.getRecord("HISTREV","CID=:ZCID",1)
-	
-	//do Db.insert("HISTREV","TSEQ","ZTSEQ")
+	do histrev.bypassSave()
 	
 	/*
+	UTBLMSG.115173 - Record Identifier ~p1 is not unique
+	if zcifins.getMode() throw Class.new("Error","ZCIFINSLOAD-E-INVLVAL,"_$$^MSG(115173,"ZINSID="_ZINSID))
+	
+	do zcifins.setAuditFlag(1)
+	set zcifins.acn = ACN
+	
+	type RecordHISTREV histrev = Db.getRecord("HISTREV","CID=:ZCID,TSEQ=:ZTSEQ")
+	type RecordHISTREV histrev = Db.getRecord("HISTREV","CID=:ZCID",1)
+	
+	do Db.insert("HISTREV","TSEQ","ZTSEQ")
+	
 	if histrev.getMode() {
 		write "found a match"
 	}
@@ -111,6 +102,74 @@ RecordLine
  	*/
  	
 	quit
+	
+Test 
+
+	type String ZTSO, ZTSEQ
+	type Number ZCID = 401000001322 //401000000340 //6000001437 //1100000294 //1100001808
+	type String ZFLAG = "ZISREV"
+	
+	//type String ZFLAG = "~ZISREV#1"
+	
+	type ResultSet zhist = Db.select("CID,TSEQ,TSO","HIST","CID = 401000001322")
+	
+	if zhist.isEmpty() do { 
+		write "no such record"
+		//TODO: add to HISTREV 
+	}
+	else do {
+		write "there is a match ", !
+		
+		while zhist.next() do {
+			set ZTSO = zhist.getCol("TSO")
+			set ZTSEQ = zhist.getCol("TSEQ")
+			
+		//write "TSO = ", ZTSO, !
+		//write "TSEQ = ", ZTSEQ, !
+		//write "CID = ", ZCID, !
+		
+		}
+		
+		//write "TSO = ", ZTSO, !
+		//write "TSEQ = ", ZTSEQ, !
+		//write "CID = ", ZCID, !
+		
+		//if ZTSO.isNull() 
+		if '(ZTSO[ZFLAG) { // if there isn't such record insert it to HISTREV 
+			
+			
+			type RecordHISTREV histrev=Db.getRecord("HISTREV","CID=:ZCID, TSEQ=:ZTSEQ",1)
+			
+			if histrev.getMode() quit 
+					
+			//type RecordHISTREV exhistrev=Db.getRecord("HISTREV","CID=:ZCID",1)
+			
+			/*
+			if exhistrev.isDefined {
+				write "such record already exists"
+				}
+			*/		
+	
+			set histrev.tseq = ZTSEQ
+			set histrev.cid = ZCID
+	
+			do histrev.bypassSave()
+			
+			write "the record to HISTREV has been added"
+			
+			}
+			
+		else do {
+			
+			write "such record already exists"
+		}
+	}
+	
+	quit
+	
+	
+	
+	
 	
 	
 	
