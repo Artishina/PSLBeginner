@@ -105,17 +105,31 @@ Insert
 	
 Test 
 
-	type String ZTSO, ZTSEQ
-	type Number ZCID = 401000001322 //401000000340 //6000001437 //1100000294 //1100001808
+	type String ZTSO
+	type Number ZTSEQ = 0 //how to make autoincrement
+	type Number ZCID = 4010000057639 //401000000340 //6000001437 //1100000294 //1100001808
 	type String ZFLAG = "ZISREV"
 	
 	//type String ZFLAG = "~ZISREV#1"
 	
-	type ResultSet zhist = Db.select("CID,TSEQ,TSO","HIST","CID = 401000001322")
+	type ResultSet zhist = Db.select("CID,TSEQ,TSO","HIST","CID = 4010000057639")
 	
 	if zhist.isEmpty() do { 
-		write "no such record"
-		//TODO: add to HISTREV 
+		write "no such record in HIST", !
+		//TODO: add to HISTREV
+		
+		type RecordHISTREV histrev=Db.getRecord("HISTREV","CID=:ZCID, TSEQ=:ZTSEQ",1)
+			
+			if histrev.getMode() quit 
+	
+			set histrev.cid = ZCID
+			set ZTSEQ = ZTSEQ + 1
+	
+			do histrev.bypassSave()
+			
+			write "THE RECORD to HISTREV has been added", !
+			
+		
 	}
 	else do {
 		write "there is a match ", !
@@ -124,20 +138,12 @@ Test
 			set ZTSO = zhist.getCol("TSO")
 			set ZTSEQ = zhist.getCol("TSEQ")
 			
-		//write "TSO = ", ZTSO, !
-		//write "TSEQ = ", ZTSEQ, !
-		//write "CID = ", ZCID, !
+		write "TSO = ", ZTSO, !
+		write "TSEQ = ", ZTSEQ, !
+		write "CID = ", ZCID, !
 		
-		}
-		
-		//write "TSO = ", ZTSO, !
-		//write "TSEQ = ", ZTSEQ, !
-		//write "CID = ", ZCID, !
-		
-		//if ZTSO.isNull() 
 		if '(ZTSO[ZFLAG) { // if there isn't such record insert it to HISTREV 
-			
-			
+					
 			type RecordHISTREV histrev=Db.getRecord("HISTREV","CID=:ZCID, TSEQ=:ZTSEQ",1)
 			
 			if histrev.getMode() quit 
@@ -155,7 +161,7 @@ Test
 	
 			do histrev.bypassSave()
 			
-			write "the record to HISTREV has been added"
+			write "the record to HISTREV has been added", !
 			
 			}
 			
@@ -163,6 +169,15 @@ Test
 			
 			write "such record already exists"
 		}
+		
+		}
+		
+		//write "TSO = ", ZTSO, !
+		//write "TSEQ = ", ZTSEQ, !
+		//write "CID = ", ZCID, !
+		
+		//if ZTSO.isNull() 
+		
 	}
 	
 	quit
