@@ -112,22 +112,19 @@ Insert
 	
 Test
 
-	//type String ZTSO
-	type Number ZTSEQ = 14
-	type Number ZCID = 401000005763
+	type Number ZTSEQ = 26
+	type Number ZCID = 401000000349
 	type Date ZTJD = %SystemDate
 	
-	//type RecordHIST zohist = Db.getRecord("HIST","CID =:ZCID,TSEQ =:ZTSEQ",1)
+	type RecordHIST zohist = Db.getRecord("HIST","CID =:ZCID,TSEQ =:ZTSEQ",1) 
 	
-	//if zohist.isDefined() do { 
-	if 'Db.isDefined("HIST","CID=:ZCID,TSEQ=:ZTSEQ") do { 
+	if 'zohist.getMode() do { 
 		
 		write "no such record in HIST", !
 		
-		//type RecordZHISTREV zohistrev = Db.getRecord("ZHISTREV","CID=:ZCID,TJD=:ZTJD,TSEQ=:ZTSEQ",1)
-		type RecordZHISTREV zohistrev = Class.new("RecordZHISTREV") //what if the record already exists?
-			
-			//if zohistrev.getMode() quit 
+		if Db.isDefined("ZHISTREV","CID=:zohist.cid,TSEQ=:zohist.tseq,TJD=:zohist.tjd") quit //system date?
+		
+		type RecordZHISTREV zohistrev = Class.new("RecordZHISTREV") 
 
 			set zohistrev.cid = ZCID
 			set zohistrev.tseq = ZTSEQ		
@@ -141,12 +138,13 @@ Test
 	else do {
 		write "there is a match record in HIST", !
 			
-		//write "TSO = ", zohist.tso, !
 		write "TSEQ = ", ZTSEQ, !
 		write "CID = ", ZCID, !				
 	}
 	
 	quit
+	
+	
 	
 	
 	
