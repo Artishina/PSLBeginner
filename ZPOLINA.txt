@@ -18,6 +18,12 @@
 	
 	quit
 	
+	
+	
+	/*
+	
+	
+	
 Avg
 	type Number AVG, BALAVL
 	
@@ -101,101 +107,31 @@ Insert
 	}
  	*/
  	
-	quit
-	
-Test0 
 
-	type String ZTSO
-	type Number ZTSEQ = 5 
-	type Number ZCID = 401000001796
-	type String ZFLAG = "ZISREV"
 	
-	//type String ZFLAG = "~ZISREV#1"
-	
-	type ResultSet zhist = Db.select("CID,TSEQ,TSO","HIST","CID =:ZCID AND TSEQ =:ZTSEQ")
-	
-	if zhist.isEmpty() do { 
-		
-		write "no such record in HIST", !
-		//TODO: add to HISTREV
-		
-		type RecordHISTREV histrev=Db.getRecord("HISTREV","CID=:ZCID, TSEQ=:ZTSEQ",1)
-			
-			if histrev.getMode() quit 
-	
-			set histrev.cid = ZCID
-			set histrev.tseq = ZTSEQ
-	
-			do histrev.bypassSave()
-			
-			write "THE RECORD to HISTREV has been added", !		
-	}
-	
-	else do {
-		write "there is a match ", !
-		
-		while zhist.next() do {
-			set ZTSO = zhist.getCol("TSO")
-			set ZTSEQ = zhist.getCol("TSEQ")
-			
-		write "TSO = ", ZTSO, !
-		write "TSEQ = ", ZTSEQ, !
-		write "CID = ", ZCID, !
-		
-		}
-	
-	if '(ZTSO[ZFLAG) { // if there isn't such record insert it to HISTREV 
-					
-			type RecordHISTREV histrev=Db.getRecord("HISTREV","CID=:ZCID, TSEQ=:ZTSEQ",1)
-			
-			if histrev.getMode() quit 
-					
-			//type RecordHISTREV exhistrev=Db.getRecord("HISTREV","CID=:ZCID",1)
-			
-			/*
-			if exhistrev.isDefined {
-				write "such record already exists"
-				}
-			*/		
-			
-			set histrev.tseq = ZTSEQ
-			set histrev.cid = ZCID
-	
-			do histrev.bypassSave()
-			
-			write "the record to HISTREV has been added", !
-			
-			}
-			
-		else do {
-			
-			write "such record exists already"
-		}
-		
-		}
-	
-	quit
 	
 Test
 
-	type String ZTSO
-	type Number ZTSEQ = 1
-	type Number ZCID = 11000018083
+	//type String ZTSO
+	type Number ZTSEQ = 14
+	type Number ZCID = 401000005763
+	type Date ZTJD = %SystemDate
 	
-	type RecordHIST zohist = Db.getRecord("HIST","CID =:ZCID,TSEQ =:ZTSEQ",1)
+	//type RecordHIST zohist = Db.getRecord("HIST","CID =:ZCID,TSEQ =:ZTSEQ",1)
 	
-	if 'zohist.getMode() do { 
+	//if zohist.isDefined() do { 
+	if 'Db.isDefined("HIST","CID=:ZCID,TSEQ=:ZTSEQ") do { 
 		
 		write "no such record in HIST", !
 		
-		type RecordHISTREV zohistrev=Db.getRecord("HISTREV","CID=:ZCID, TSEQ=:ZTSEQ",1)
+		//type RecordZHISTREV zohistrev = Db.getRecord("ZHISTREV","CID=:ZCID,TJD=:ZTJD,TSEQ=:ZTSEQ",1)
+		type RecordZHISTREV zohistrev = Class.new("RecordZHISTREV") //what if the record already exists?
 			
-			if zohistrev.getMode() quit 
-	
+			//if zohistrev.getMode() quit 
+
 			set zohistrev.cid = ZCID
 			set zohistrev.tseq = ZTSEQ		
-			set zohistrev.spd = %SystemDate
-			set zohistrev.cdt = %CurrentDate
+			set zohistrev.tjd = ZTJD
 	
 			do zohistrev.bypassSave()
 			
@@ -205,14 +141,12 @@ Test
 	else do {
 		write "there is a match record in HIST", !
 			
-		write "TSO = ", zohist.tso, !
+		//write "TSO = ", zohist.tso, !
 		write "TSEQ = ", ZTSEQ, !
 		write "CID = ", ZCID, !				
 	}
-
+	
 	quit
-	
-	
 	
 	
 	
