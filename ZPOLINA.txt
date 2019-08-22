@@ -44,9 +44,9 @@ PROC
 	type RecordLN ln
 	type Number CID, CNT = 0
 	
-	write "hh" 
+	write "hh", !
 	
-	write RETURN
+	//write RETURN
 	
 	catch mrpcErr {
 		if mrpcErr.component = "%GTM" do LOGERR^UTLERR(mrpcErr)
@@ -138,7 +138,10 @@ PROC
 		if 'Db.isDefined("CIF","ACN=:ACN") throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(3079, ACN))
 	
 		type DbSet dbs = Db.selectDbSet("DEP", "ACN=:ACN AND ZCONTRACT IS NOT NULL")
-		while dbs.next() set dep = dbs.getRecord() do DATA(dep,ZPFOLIO)
+		while dbs.next() set dep = dbs.getRecord() do {
+			
+			if dep.stat = 0 do DATA(dep,ZPFOLIO)
+		}
 
 		// Temporary filter controls addition of CC-accounts 
 		type literal RecordZUTBLPARAM zutblparam = Db.getRecord("ZUTBLPARAM", "PARAMGRP = 'CREDITCARD', PARAM = 'APNDCC3INT'")
@@ -171,7 +174,7 @@ PROC
 		
 		if ZBNSACC do findBnsAccounts(ACN, .RETURN)
 	
-		write RETURN
+		//write RETURN
 		
 		// No Active Deposit Accounts Linked to Customer
 		if CNT = 0 do ADDCLIENT(ACN)
@@ -179,7 +182,13 @@ PROC
 	
 	set RETURN = $$V2LV^MSG(RETURN())
 	
-	write RETURN
+	
+	write " ", !
+	write " ", !
+	write "count = ", CNT, !
+	write " ", !
+	write " ", !
+	write RETURN, !
 
 	quit //RETURN
 	
@@ -492,13 +501,17 @@ DATA(RecordDEP dep, Boolean ZPFOLIO, Boolean CESSION)
 	// Derive account status
 	type String ZDEPSTAT = dep.stat
 	if CESSION.get() set ZDEPSTAT = 109
+	
+	//if dep.stat = 0 do {
 
-	set RETURN = RETURN_"DEP-IDENT"_TAB_dep.zcontract_TAB_dep.zmaster_TAB_dep.type_TAB_dep.typedes_TAB_dep.boo
+	set RETURN = RETURN_"DEP-IDENT"_TAB_dep.zcontract_TAB_dep.zmaster_TAB_dep.type_TAB_dep.typedes_TAB_dep.boo_TAB_"AAAAAAAAA"
 	set RETURN = RETURN_TAB_dep.brreg_TAB_dep.cc_TAB_CRCD_TAB_BAL.roundCur(CRCD)_TAB_ZPFBAL.roundCur(CRCD)
 	set RETURN = RETURN_TAB_ZOWNFUND.roundCur(CRCD)_TAB_ZTOTLIEN.roundCur(CRCD)_TAB_ZTOTRQST.roundCur(CRCD)_TAB_dep.odt_TAB_ZDEPSTAT
 	set RETURN = RETURN_TAB_dep.dtc_TAB_ZDEFPMTD.roundCur(CRCD)_TAB_ZDEFFEED.roundCur(CRCD)_TAB_ZSTOPFLAG_TAB_dep.zdtc
 	set RETURN = RETURN_TAB_dep.index_TAB_dep.zpirn_TAB_dep.znirn_TAB_ZTOTFBANY.roundCur(CRCD)_TAB_dep.zmir_TAB
-
+	
+	//}
+	
 	// Overdraft field
 	if dep.odflg do {
 
@@ -518,7 +531,7 @@ DATA(RecordDEP dep, Boolean ZPFOLIO, Boolean CESSION)
 		type Number zminpmnt = ln.cupr + ln.cuin
 		type Number zunovrpen = dep.resint
 
-		set RETURN = RETURN_ln.stat_TAB_ln.crlmt_TAB_ln.odd_TAB_ln.dtc
+		set RETURN = RETURN_ln.stat_TAB_ln.crlmt_TAB_ln.odd_TAB_ln.dtc_TAB_" DDDDDDDD"
 		set RETURN = RETURN_TAB_ln.zkod_TAB_ln.irn_TAB_ln.schnd
 		
 		set RETURN = RETURN_TAB_(ln.bal - ln.unpr).roundCur(ln.crcd)_TAB	// overdraft_due_current_period
