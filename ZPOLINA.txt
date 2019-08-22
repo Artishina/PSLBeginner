@@ -1,4 +1,5 @@
 //DO NOT MODIFY  My first procedure|ZPOLINA|||||||1
+public ZPOLINA(String RETURN, Number VERSN, Number ACN, String CONTRACT, Boolean ZPFOLIO, Date EFD, Boolean ZBNSACC, Boolean ZSHOWNER)
 	/*
 	 ORIG: 1 - 22/11/2014
 	 DESC: 
@@ -16,7 +17,7 @@
 	
 	//do test
 	
-	quit
+	//quit
 	
 	
 
@@ -42,6 +43,10 @@ PROC
 	type RecordDEP dep
 	type RecordLN ln
 	type Number CID, CNT = 0
+	
+	write "hh" 
+	
+	write RETURN
 	
 	catch mrpcErr {
 		if mrpcErr.component = "%GTM" do LOGERR^UTLERR(mrpcErr)
@@ -119,7 +124,7 @@ PROC
 				// Invalid account number (account does not exist)
 				if 'dep.getMode() throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(7822))
 				
-				//do DATA(dep,ZPFOLIO)
+				do DATA(dep,ZPFOLIO)
 				
 				// Account is not in active or pending status
 				if CNT = 0 throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(101019))
@@ -133,7 +138,7 @@ PROC
 		if 'Db.isDefined("CIF","ACN=:ACN") throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(3079, ACN))
 	
 		type DbSet dbs = Db.selectDbSet("DEP", "ACN=:ACN AND ZCONTRACT IS NOT NULL")
-		//while dbs.next() set dep = dbs.getRecord() do DATA(dep,ZPFOLIO)
+		while dbs.next() set dep = dbs.getRecord() do DATA(dep,ZPFOLIO)
 
 		// Temporary filter controls addition of CC-accounts 
 		type literal RecordZUTBLPARAM zutblparam = Db.getRecord("ZUTBLPARAM", "PARAMGRP = 'CREDITCARD', PARAM = 'APNDCC3INT'")
@@ -161,18 +166,22 @@ PROC
 			set dep = Db.getRecord("DEP", "CID=:ZDEPCID", 1)
 			if dep.acn = ACN quit		// For avoid extracting same account twice
 			
-			//do DATA(dep,ZPFOLIO, true)
+			do DATA(dep,ZPFOLIO, true)
 		}
 		
 		if ZBNSACC do findBnsAccounts(ACN, .RETURN)
 	
+		write RETURN
+		
 		// No Active Deposit Accounts Linked to Customer
 		if CNT = 0 do ADDCLIENT(ACN)
 	}
 	
 	set RETURN = $$V2LV^MSG(RETURN())
+	
+	write RETURN
 
-	quit
+	quit //RETURN
 	
 CCDATA(RecordLN ln)
 
@@ -369,24 +378,15 @@ CCDATA(RecordLN ln)
 
 	quit
 	
-DATA
+DATA(RecordDEP dep, Boolean ZPFOLIO, Boolean CESSION)
 
-	type RecordDEP dep = Db.getRecord("DEP","CID=:1100002459",1)
-	
-	type Boolean ZPFOLIO = true
-	
-	type Boolean CESSION = true
-	
-	//type RecordLN ln = Db.getRecord("LN", "CID=:zlncid", 1)
-	
-	
 	type literal String TAB = (9).char()
 	type literal String EOL = (13,10).char()
 	
 	type public Boolean ER, ZSHOWNER
 	type public String RETURN, RM, CLILIST
 	type public Number ACN,CNT
-	type public Date EFD = %CurrentDate, ZSTFDATE = %CurrentDate
+	type public Date EFD, ZSTFDATE
 	
 	type String CRCD
 	type Number ZPFBAL, BAL
