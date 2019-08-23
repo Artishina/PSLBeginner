@@ -786,6 +786,134 @@ EFDBAL(Number CID, Date EFD)
 	}
 	
 	quit +ENDBAL
+	
+
+FILE
+
+
+	type IO io = Class.new("IO")
+
+	set io.directory = "/u01/study/spool"
+	set io.fileName = "TEST1.txt"
+	set io.openParams = "WRITE"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
+		
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+
+	//do io.open()
+
+	type String TEXT
+	set TEXT = "PAM PAM PAM"
+	do io.write(TEXT)
+	do io.close()
+
+
+	quit
+
+FILERR
+	
+	type IO io = Class.new("IO")
+
+	set io.directory = "/u01/study/spool" 
+	set io.fileName = "TEST1.txt"
+	set io.openParams = "READ"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+
+	/*
+	catch iox {
+      		// if device has been opened, close it
+      		if io.device'="" do io.close()
+      		// if not an IO exception, it's not for us
+      		if iox'["%PSL-E-IO" throw iox
+      		// handle the IO exceptions
+      		if iox["IOOPEN" write "Open failed", ! quit
+      		if iox["IOEOF"  write "Reached end of file", ! quit
+      		write "unexpected IO error '", iox.type, "'", !
+	}
+	*/
+
+	//type String PART1,PART2,REC
+
+	//for  set REC = io.read() do {
+  	//	set PART1 = REC.piece("#",2)
+  	//	set PART2 = REC.piece(";",2)
+	//}
+	//set rec = io.read()
+	
+	
+	type literal String TAB = 9.char()
+	
+	type String rec
+	type String PART1,PART2,PART3,PART4
+	
+	for set rec = io.read() do {
+		set PART1 = REC.piece(TAB,1)
+  		set PART2 = REC.piece(TAB,2)
+  		set PART3 = REC.piece(TAB,2,3)
+  		set PART4 = REC.piece(TAB,2,4)
+		}
+		
+	write rec, !
+	write PART1, !
+	write PART2, !
+	write PART3, !
+	write PART4, !
+	
+	
+	/*
+	// Loop through the input file
+	for  set valueOfFileRecord = io.read() {
+		
+		set numberOfRecord = numberOfRecord + 1
+		
+		type RecordTMPRPT2 tmprpt2 = Class.new("RecordTMPRPT2")
+		
+		set tmprpt2.pid = %ProcessID
+		set tmprpt2.key1 = XINKEY
+		set tmprpt2.key2 = numberOfRecord
+		set tmprpt2.data = valueOfFileRecord
+		
+		do tmprpt2.bypassSave()
+	}
+	
+	do io.close()
+	*/
+	
+	do io.close()
+
+	quit
+
+
+
+
+
+
+
+
 
 	
 	

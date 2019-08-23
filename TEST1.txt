@@ -1,6 +1,5 @@
-ID	NAME	CITY	AGE	BIRTHDATE					
-1			20
-2	Ашот		21		
-3	Антон		
-4	Саша		22
-5	Вася		22
+	Moscow	20	12.12.12	
+Anton		21	12.12.12	
+Anton	Ufa		12.12.12	
+Sasha	Kazan	22		
+Vasia	Penza	22	12.12.12
