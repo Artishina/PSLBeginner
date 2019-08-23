@@ -821,7 +821,7 @@ FILE
 
 	quit
 
-FILERR
+FILERE
 	
 	type IO io = Class.new("IO")
 
@@ -843,19 +843,6 @@ FILERR
      	 	write "Open failed: ", ioxcpt.type, !
 	}
 
-	/*
-	catch iox {
-      		// if device has been opened, close it
-      		if io.device'="" do io.close()
-      		// if not an IO exception, it's not for us
-      		if iox'["%PSL-E-IO" throw iox
-      		// handle the IO exceptions
-      		if iox["IOOPEN" write "Open failed", ! quit
-      		if iox["IOEOF"  write "Reached end of file", ! quit
-      		write "unexpected IO error '", iox.type, "'", !
-	}
-	*/
-
 	//type String PART1,PART2,REC
 
 	//for  set REC = io.read() do {
@@ -869,19 +856,37 @@ FILERR
 	
 	type String rec
 	type String PART1,PART2,PART3,PART4
+	type Number ZCNT = 0
 	
-	for set rec = io.read() do {
-		set PART1 = REC.piece(TAB,1)
-  		set PART2 = REC.piece(TAB,2)
-  		set PART3 = REC.piece(TAB,2,3)
-  		set PART4 = REC.piece(TAB,2,4)
+	write ZCNT, !
+	
+	for  set rec = io.read()  do {
+		write "1cnt = ", ZCNT, !
+		
+		set ZCNT = ZCNT + 1
+		set PART1 = rec.piece(TAB,1)
+		set PART2 = rec.piece(TAB,2)
+		set PART3 = rec.piece(TAB,3)
+		set PART4 = rec.piece(TAB,4)
+	
+		write "p1 ", PART1, !
+		write "p2 ", PART2, !
+		write "p3 ", PART3, !
+		write "p4 ", PART4, !
+  		
+  		write "2cnt = ",ZCNT, !
 		}
 		
-	write rec, !
-	write PART1, !
-	write PART2, !
-	write PART3, !
-	write PART4, !
+	write "aaa"
+		
+	//write rec, !
+	//write PART1, !
+
+	//write ZCNT, !
+	
+	do io.close()
+
+	quit
 	
 	
 	/*
@@ -903,9 +908,6 @@ FILERR
 	do io.close()
 	*/
 	
-	do io.close()
-
-	quit
 
 
 
