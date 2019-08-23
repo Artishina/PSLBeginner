@@ -1,0 +1,6 @@
+ID	NAME	CITY	AGE	BIRTHDATE					
+1			20
+2	Ашот		21		
+3	Антон		
+4	Саша		22
+5	Вася		22

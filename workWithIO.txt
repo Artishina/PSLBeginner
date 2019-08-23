@@ -1,0 +1,32 @@
+FILE
+
+
+	type IO io = Class.new("IO")
+
+	set io.directory = "/u01/study/spool"
+	set io.fileName = "TEST1.txt"
+	set io.openParams = "NEWV/WRITE"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
+		
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+
+	//do io.open()
+
+	type String TEXT
+	set TEXT = "PAM PAM PAM"
+	do io.write(TEXT)
+	do io.close()
+
+
+	quit
