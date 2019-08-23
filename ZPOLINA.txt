@@ -312,7 +312,7 @@ CCDATA(RecordLN ln)
 	
 	type RecordLNSEG lnseg = Db.getRecord("LNSEG","CID=:ln.cid,SEGMENT=1",1)
 	if lnseg.getMode() set IRN = lnseg.irn.roundCur(ln.crcd)
-	set RETURN = RETURN_"DEP-IDENT"_TAB_ln.zccuracc
+	set RETURN = RETURN_"DEP-IDENT_LN"_TAB_ln.zccuracc
 	set RETURN = RETURN_TAB_""
 	set RETURN = RETURN_TAB_ln.type
 	set RETURN = RETURN_TAB_ln.typedes
@@ -501,16 +501,12 @@ DATA(RecordDEP dep, Boolean ZPFOLIO, Boolean CESSION)
 	// Derive account status
 	type String ZDEPSTAT = dep.stat
 	if CESSION.get() set ZDEPSTAT = 109
-	
-	//if dep.stat = 0 do {
 
-	set RETURN = RETURN_"DEP-IDENT"_TAB_dep.zcontract_TAB_dep.zmaster_TAB_dep.type_TAB_dep.typedes_TAB_dep.boo_TAB_"AAAAAAAAA"
+	set RETURN = RETURN_"DEP-IDENT_DEP"_TAB_dep.zcontract_TAB_dep.zmaster_TAB_dep.type_TAB_dep.typedes_TAB_dep.boo_TAB_"AAAAAAAAA"
 	set RETURN = RETURN_TAB_dep.brreg_TAB_dep.cc_TAB_CRCD_TAB_BAL.roundCur(CRCD)_TAB_ZPFBAL.roundCur(CRCD)
 	set RETURN = RETURN_TAB_ZOWNFUND.roundCur(CRCD)_TAB_ZTOTLIEN.roundCur(CRCD)_TAB_ZTOTRQST.roundCur(CRCD)_TAB_dep.odt_TAB_ZDEPSTAT
 	set RETURN = RETURN_TAB_dep.dtc_TAB_ZDEFPMTD.roundCur(CRCD)_TAB_ZDEFFEED.roundCur(CRCD)_TAB_ZSTOPFLAG_TAB_dep.zdtc
 	set RETURN = RETURN_TAB_dep.index_TAB_dep.zpirn_TAB_dep.znirn_TAB_ZTOTFBANY.roundCur(CRCD)_TAB_dep.zmir_TAB
-	
-	//}
 	
 	// Overdraft field
 	if dep.odflg do {
