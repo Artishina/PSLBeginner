@@ -1,5 +1,6 @@
-	Moscow	20	12.12.12	
-Anton		21	12.12.12	
-Anton	Ufa		12.12.12	
-Sasha	Kazan	22		
-Vasia	Penza	22	12.12.12
+#DTL		Moscow	20	12	
+#DTL	Anton		21	12.12.12	
+#DTL	Anton	Ufa		12.12.12	
+#DTL	Sasha	Kazan	22		
+#DTL	Vasia	Penza	22	12.12.12
+#FTR

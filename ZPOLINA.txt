@@ -788,13 +788,13 @@ EFDBAL(Number CID, Date EFD)
 	quit +ENDBAL
 	
 
-FILE
+FILE(String cnt)
 
 
 	type IO io = Class.new("IO")
 
 	set io.directory = "/u01/study/spool"
-	set io.fileName = "TEST1.txt"
+	set io.fileName = "TEST2.txt"
 	set io.openParams = "WRITE"
 	
 	set io.timeout = 5
@@ -813,15 +813,14 @@ FILE
 
 	//do io.open()
 
-	type String TEXT
-	set TEXT = "PAM PAM PAM"
-	do io.write(TEXT)
+	//type String TEXT
+	//set TEXT = "PAM PAM PAM"
+	do io.write(cnt)
 	do io.close()
-
 
 	quit
 
-FILERE
+INPUT
 	
 	type IO io = Class.new("IO")
 
@@ -842,71 +841,144 @@ FILERE
 
      	 	write "Open failed: ", ioxcpt.type, !
 	}
-
-	//type String PART1,PART2,REC
-
-	//for  set REC = io.read() do {
-  	//	set PART1 = REC.piece("#",2)
-  	//	set PART2 = REC.piece(";",2)
-	//}
-	//set rec = io.read()
-	
 	
 	type literal String TAB = 9.char()
-	
 	type String rec
 	type String PART1,PART2,PART3,PART4
 	type Number ZCNT = 0
-	
-	write ZCNT, !
+	type Boolean ZFTR = false
 	
 	for  set rec = io.read()  do {
-		write "1cnt = ", ZCNT, !
 		
+		if rec.beginsWith("#DTL") do {
+			
 		set ZCNT = ZCNT + 1
-		set PART1 = rec.piece(TAB,1)
-		set PART2 = rec.piece(TAB,2)
-		set PART3 = rec.piece(TAB,3)
-		set PART4 = rec.piece(TAB,4)
+		
+		set PART1 = rec.piece(TAB,2)
+		set PART2 = rec.piece(TAB,3)
+		set PART3 = rec.piece(TAB,4)
+		set PART4 = rec.piece(TAB,5)
 	
 		write "p1 ", PART1, !
 		write "p2 ", PART2, !
 		write "p3 ", PART3, !
 		write "p4 ", PART4, !
-  		
-  		write "2cnt = ",ZCNT, !
+		
+		type RecordTABLE1 ztable = Class.new("RecordTABLE1")
+		
+		set ztable.id = ZCNT
+		set ztable.zname = PART1
+		set ztable.city = PART2
+		set ztable.age = PART3
+		set ztable.birthdate = PART4
+		
+		do ztable.bypassSave()
 		}
 		
-	write "aaa"
+		else if rec.beginsWith("#FTR") do {
+			write "footer"
+			
+			if (+rec.piece(TAB,2)'= ZCNT) throw Class.new("Error", "ERROR-E-FATAL,"_$$^MSG(115182))
+								
+			set ZFTR = true
+			
+			write "footer's end"
+			//do io.close()
+			//do FILE(ZCNT)
+		}
 		
+		else  throw Class.new("Error", "ZDFEEREV-E-FATAL,"_$$^MSG(115233))
+	}	
+		//write "saved into TABLE ", ZCNT, !		
+		
+	write "dd"
+	
+	//do FILE(ZCNT)	
 	//write rec, !
 	//write PART1, !
 
 	//write ZCNT, !
 	
-	do io.close()
+	if ZFTR do io.close()
 
 	quit
 	
 	
-	/*
-	// Loop through the input file
-	for  set valueOfFileRecord = io.read() {
+TABLEDEL
+
+	//type literal Number ZID = 2
+	//type literal Number ZIDE = 25
+	
+	//do Db.fastDelete("TABLE1","ID=:3,ID=:4")
+	
+	type Number cnt = 0
+	
+	while (cnt < 27) do {	
+		do Db.delete("TABLE1","ID=:cnt")
+		set cnt = cnt + 1
+	}
 		
-		set numberOfRecord = numberOfRecord + 1
+	quit
+	
+OUTPUT 
+
+	type literal String EOL = (13,10).char()
+	type literal String TAB = 9.char()
+	type String rec, ZDATA 
+	type Number ZRECNT,ZRECERR
+	
+	type IO io = Class.new("IO")
+
+	set io.directory = "/u01/study/spool"
+	set io.fileName = "TEST2.LOG"
+	set io.openParams = "NEWV/WRITE"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
 		
-		type RecordTMPRPT2 tmprpt2 = Class.new("RecordTMPRPT2")
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+
+	set rec = "#HDR"_TAB_"TEST1"_TAB_%SystemDate.toString(CUVAR.ZMSKD)
+	set rec = rec_TAB_$$compTS^ZDFMVAL(%CurrentDate_","_%CurrentTime)
+	//set rec = rec_TAB_+XHDRERR.get()_TAB_XHDRERM.get()
+	
+	do io.write(rec, EOL)
+	
+	
+	
+	set (ZRECNT,ZRECERR) = 0
+	
+	type DbSet ztable1 = Db.selectDbSet("TABLE1")
+	while ztable1.next() do {
 		
-		set tmprpt2.pid = %ProcessID
-		set tmprpt2.key1 = XINKEY
-		set tmprpt2.key2 = numberOfRecord
-		set tmprpt2.data = valueOfFileRecord
+		type RecordTABLE1 table1 = ztable1.getRecord("TABLE1")
 		
-		do tmprpt2.bypassSave()
+		set ZDATA = table1.zname	// Data
+	
+		set ZRECNT = ZRECNT + 1					// Total number of record
+		
+		
+		
+		//if ZDATA.piece(TAB,5)=1 set ZRECERR = ZRECERR + 1	// Record in Error
+				
+		do io.write("#DTL"_TAB_ZRECNT, EOL)
 	}
 	
+	
+
 	do io.close()
-	*/
+
+	quit	
+
 	
 
 
