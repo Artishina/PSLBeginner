@@ -847,17 +847,20 @@ INPUT
 	type String PART1,PART2,PART3,PART4
 	type Number ZCNT = 0
 	type Boolean ZFTR = false
+	type Number ID = 0
 	
 	for  set rec = io.read()  do {
 		
-		if rec.beginsWith("#DTL") do {
+		//if rec.beginsWith("#DTL") do {
+		
+		//if ID <> 6 {
 			
 		set ZCNT = ZCNT + 1
 		
-		set PART1 = rec.piece(TAB,2)
-		set PART2 = rec.piece(TAB,3)
-		set PART3 = rec.piece(TAB,4)
-		set PART4 = rec.piece(TAB,5)
+		set PART1 = rec.piece(TAB,1)
+		set PART2 = rec.piece(TAB,2)
+		set PART3 = rec.piece(TAB,3)
+		set PART4 = rec.piece(TAB,4)
 	
 		write "p1 ", PART1, !
 		write "p2 ", PART2, !
@@ -873,34 +876,25 @@ INPUT
 		set ztable.birthdate = PART4
 		
 		do ztable.bypassSave()
-		}
 		
-		else if rec.beginsWith("#FTR") do {
-			write "footer"
+		write "ss", !
+		//}
 			
-			if (+rec.piece(TAB,2)'= ZCNT) throw Class.new("Error", "ERROR-E-FATAL,"_$$^MSG(115182))
-								
-			set ZFTR = true
-			
-			write "footer's end"
-			//do io.close()
-			//do FILE(ZCNT)
-		}
-		
-		else  throw Class.new("Error", "ZDFEEREV-E-FATAL,"_$$^MSG(115233))
-	}	
-		//write "saved into TABLE ", ZCNT, !		
-		
-	write "dd"
+		set ID = Db.nextVal("TABLE1") 
 	
-	//do FILE(ZCNT)	
-	//write rec, !
-	//write PART1, !
-
-	//write ZCNT, !
+		write "ID ", ID, !
+		
+		//if ID = 6 break
+		if ID = 6 do OUTPUT
+	}		
+		
+	set ID = Db.nextVal("TABLE1") 
 	
-	if ZFTR do io.close()
-
+	write "ID ", ID, !
+	
+	//if ZFTR do io.close()
+	do io.close()
+	
 	quit
 	
 	
@@ -913,7 +907,7 @@ TABLEDEL
 	
 	type Number cnt = 0
 	
-	while (cnt < 27) do {	
+	while (cnt < 228) do {	
 		do Db.delete("TABLE1","ID=:cnt")
 		set cnt = cnt + 1
 	}
@@ -924,8 +918,8 @@ OUTPUT
 
 	type literal String EOL = (13,10).char()
 	type literal String TAB = 9.char()
-	type String rec, ZDATA 
-	type Number ZRECNT,ZRECERR
+	type String rec,ZNAME,ZAGE,ZBD,ZCITY
+	type Number ZRECNT,ZRECERR,ZRECEM
 	
 	type IO io = Class.new("IO")
 
@@ -952,28 +946,41 @@ OUTPUT
 	//set rec = rec_TAB_+XHDRERR.get()_TAB_XHDRERM.get()
 	
 	do io.write(rec, EOL)
+		
 	
-	
-	
-	set (ZRECNT,ZRECERR) = 0
+	set (ZRECNT,ZRECERR,ZRECEM) = 0
 	
 	type DbSet ztable1 = Db.selectDbSet("TABLE1")
+	
 	while ztable1.next() do {
 		
 		type RecordTABLE1 table1 = ztable1.getRecord("TABLE1")
 		
-		set ZDATA = table1.zname	// Data
+		set ZNAME = table1.zname
+		set ZBD = table1.birthdate
+		set ZCITY= table1.city
+		set ZAGE = table1.age
 	
 		set ZRECNT = ZRECNT + 1					// Total number of record
+
 		
+		if 'ZNAME.isNull() set ZRECERR = ZRECERR + 1 else set ZRECEM = ZRECEM + 1
+		if 'ZBD.isNull()  set ZRECERR = ZRECERR + 1 
+		if 'ZCITY.isNull()  set ZRECERR = ZRECERR + 1 
+		if 'ZAGE.isNull()  set ZRECERR = ZRECERR + 1 
 		
-		
-		//if ZDATA.piece(TAB,5)=1 set ZRECERR = ZRECERR + 1	// Record in Error
+		if ZNAME.isNull() set ZRECEM = ZRECEM + 1
+		if ZBD.isNull()  set ZRECEM = ZRECEM + 1
+		if ZCITY.isNull()  set ZRECEM = ZRECEM + 1
+		if ZAGE.isNull()  set ZRECEM = ZRECEM + 1
 				
-		do io.write("#DTL"_TAB_ZRECNT, EOL)
+		do io.write("#DTL"_TAB_ZRECNT_TAB_ZRECERR, EOL)
+		
+		set ZRECERR = 0
 	}
 	
-	
+	set rec = "#FTR"_TAB_ZRECEM
+	do io.write(rec, EOL)
 
 	do io.close()
 
