@@ -1,6 +1,5 @@
-#DTL		Moscow	20	12	
-#DTL	Anton		21	12.12.12	
-#DTL	Anton	Ufa		12.12.12	
-#DTL	Sasha	Kazan	22		
-#DTL	Vasia	Penza	22	12.12.12
-#FTR
+	Moscow	20	52011
+Anton		21	52122	
+Anton	Ufa		52934	
+Sasha	Kazan	22		
+Vasia	Penza	22	52464

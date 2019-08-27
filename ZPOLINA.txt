@@ -834,26 +834,40 @@ INPUT
 	
 	do io.open()
 	
-	catch ioxcpt {
-		do io.close()
-     	 	if ioxcpt'["%PSL-E-IO" quit
-     	 	throw ioxcpt
-
-     	 	write "Open failed: ", ioxcpt.type, !
-	}
-	
 	type literal String TAB = 9.char()
-	type String rec
-	type String PART1,PART2,PART3,PART4
+	type String rec,PART1,PART2,PART3,PART4
 	type Number ZCNT = 0
 	type Boolean ZFTR = false
-	type Number ID = 0
+	type Number ID = 1
+	type Number i = 0
 	
 	for  set rec = io.read()  do {
 		
-		//if rec.beginsWith("#DTL") do {
+		/*
+		catch iox {
+			write "iox",!
+      			//if device has been opened, close it
+      			do io.close()
+      		
+      			//if not an IO exception
+      			if iox'["%PSL-E-IO" throw iox
+      			//handle the IO exceptions
+      			if iox["IOOPEN" write "Open failed", ! quit
+      			if iox["IOEOF"  write "Reached end of file", ! quit
+      			write "unexpected IO error '", iox.type, "'", !
+      		}
+		*/
 		
-		//if ID <> 6 {
+		catch e {
+			write "e",!
+			do OUTPUT
+			do io.close()
+     	 		if e["%GTM-E-SETECODE" do io.close() quit
+     	 		throw e
+
+     	 		write "file closed: ", e.type, !
+		}
+		
 			
 		set ZCNT = ZCNT + 1
 		
@@ -869,7 +883,7 @@ INPUT
 		
 		type RecordTABLE1 ztable = Class.new("RecordTABLE1")
 		
-		set ztable.id = ZCNT
+		set ztable.id = Db.nextVal("TABLE1")
 		set ztable.zname = PART1
 		set ztable.city = PART2
 		set ztable.age = PART3
@@ -877,22 +891,13 @@ INPUT
 		
 		do ztable.bypassSave()
 		
-		write "ss", !
-		//}
-			
-		set ID = Db.nextVal("TABLE1") 
-	
-		write "ID ", ID, !
+		do OUTPUT
 		
-		//if ID = 6 break
-		if ID = 6 do OUTPUT
-	}		
-		
-	set ID = Db.nextVal("TABLE1") 
+		//else throw Class.new("Error", "ZPOLINA-E-FATAL,"_$$^MSG(115233))
+	}	
 	
-	write "ID ", ID, !
+	write "aaa"
 	
-	//if ZFTR do io.close()
 	do io.close()
 	
 	quit
@@ -943,11 +948,9 @@ OUTPUT
 
 	set rec = "#HDR"_TAB_"TEST1"_TAB_%SystemDate.toString(CUVAR.ZMSKD)
 	set rec = rec_TAB_$$compTS^ZDFMVAL(%CurrentDate_","_%CurrentTime)
-	//set rec = rec_TAB_+XHDRERR.get()_TAB_XHDRERM.get()
 	
 	do io.write(rec, EOL)
 		
-	
 	set (ZRECNT,ZRECERR,ZRECEM) = 0
 	
 	type DbSet ztable1 = Db.selectDbSet("TABLE1")
@@ -961,10 +964,9 @@ OUTPUT
 		set ZCITY= table1.city
 		set ZAGE = table1.age
 	
-		set ZRECNT = ZRECNT + 1					// Total number of record
-
-		
-		if 'ZNAME.isNull() set ZRECERR = ZRECERR + 1 else set ZRECEM = ZRECEM + 1
+		set ZRECNT = ZRECNT + 1		// Total number of records
+	
+		if 'ZNAME.isNull() set ZRECERR = ZRECERR + 1 
 		if 'ZBD.isNull()  set ZRECERR = ZRECERR + 1 
 		if 'ZCITY.isNull()  set ZRECERR = ZRECERR + 1 
 		if 'ZAGE.isNull()  set ZRECERR = ZRECERR + 1 
@@ -985,10 +987,6 @@ OUTPUT
 	do io.close()
 
 	quit	
-
-	
-
-
 
 
 
