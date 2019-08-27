@@ -820,7 +820,7 @@ FILE(String cnt)
 
 	quit
 
-INPUT
+INPUT0
 	
 	type IO io = Class.new("IO")
 
@@ -834,41 +834,46 @@ INPUT
 	
 	do io.open()
 	
+	catch ioxcpt {
+		do io.close()
+		
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+	
 	type literal String TAB = 9.char()
-	type String rec,PART1,PART2,PART3,PART4
+	type String rec
+	type String PART1,PART2,PART3,PART4
 	type Number ZCNT = 0
 	type Boolean ZFTR = false
-	type Number ID = 1
+	//type Number ID 
 	type Number i = 0
 	
 	for  set rec = io.read()  do {
 		
 		/*
-		catch iox {
-			write "iox",!
-      			//if device has been opened, close it
-      			do io.close()
-      		
-      			//if not an IO exception
-      			if iox'["%PSL-E-IO" throw iox
-      			//handle the IO exceptions
-      			if iox["IOOPEN" write "Open failed", ! quit
-      			if iox["IOEOF"  write "Reached end of file", ! quit
-      			write "unexpected IO error '", iox.type, "'", !
-      		}
-		*/
-		
 		catch e {
 			write "e",!
 			do OUTPUT
 			do io.close()
-     	 		if e["%GTM-E-SETECODE" do io.close() quit
-     	 		throw e
-
-     	 		write "file closed: ", e.type, !
+			if e.type = "%PSL-E-IOEOF" quit
+						
+			throw e
+		
+     	 		//if e["%GTM-E-SETECODE" do io.close() quit
+     	 		//throw e
+     	 		//write "file closed: ", e.type, !
 		}
 		
-			
+		catch ex {
+			do io.close()
+			quit
+     	 		//throw ex
+     	 		//write "Open failed: ", ex.type, !
+		}
+		*/
+		
 		set ZCNT = ZCNT + 1
 		
 		set PART1 = rec.piece(TAB,1)
@@ -891,14 +896,14 @@ INPUT
 		
 		do ztable.bypassSave()
 		
-		do OUTPUT
+		do OUTPUT	
 		
 		//else throw Class.new("Error", "ZPOLINA-E-FATAL,"_$$^MSG(115233))
 	}	
 	
-	write "aaa"
-	
 	do io.close()
+	do OUTPUT
+	write "aaa"
 	
 	quit
 	
@@ -946,8 +951,7 @@ OUTPUT
      	 	write "Open failed: ", ioxcpt.type, !
 	}
 
-	set rec = "#HDR"_TAB_"TEST1"_TAB_%SystemDate.toString(CUVAR.ZMSKD)
-	set rec = rec_TAB_$$compTS^ZDFMVAL(%CurrentDate_","_%CurrentTime)
+	set rec = "#HDR"_TAB_"TEST1"_TAB_$$compTS^ZDFMVAL(%CurrentDate_","_%CurrentTime)
 	
 	do io.write(rec, EOL)
 		
@@ -988,11 +992,106 @@ OUTPUT
 
 	quit	
 
+INPUT(String fileDirectory, String filesName)
+	
+	type IO io = Class.new("IO")
 
+	set io.directory = fileDirectory //"/u01/study/spool" 
+	set io.fileName = filesName //"TEST1.txt"
+	set io.openParams = "READ"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
 
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+	
+	do INITSYS
+	
+	type literal String TAB = 9.char()
+	type String rec
+	type String PART1,PART2,PART3,PART4
+	type Number ZCNT = 0
+	type Boolean ZFTR = false
+	//type Error $ECODE
+	
+	//type literal String SP = 32.char()
+	//type literal String LF = 10.char()
+	
+	for  set rec = io.read()  do {
+		
+		catch ex {
+			//do io.close()
+			//quit
+            		if ex'["%PSL-E-IO" throw ex     
+            		if ex["IOOPEN" write "Open failed", ! do io.close() quit
+            		if ex["IOEOF"  write "Reached end of file", ! do io.close() quit
+            		write "unexpected IO error '", ex.type, "'", !
+		}
+			
+		//if rec.piece(TAB) = "ftr" do {
+		if rec.beginsWith("ftr") do {
+					
+			do io.close()
+			throw Class.new("Error", "ZPOLINA-E-FATAL,"_$$^MSG(115233))
+			quit
+		}
+		
+		set ZCNT = ZCNT + 1
+		
+		set PART1 = rec.piece(TAB,1)
+		set PART2 = rec.piece(TAB,2)
+		set PART3 = rec.piece(TAB,3)
+		set PART4 = rec.piece(TAB,4)
+	
+		write "p1 ", PART1, !
+		write "p2 ", PART2, !
+		write "p3 ", PART3, !
+		write "p4 ", PART4, !
+		
+		type RecordTABLE1 ztable = Class.new("RecordTABLE1")
+		
+		set ztable.id = Db.nextVal("TABLE1")
+		set ztable.zname = PART1
+		set ztable.city = PART2
+		set ztable.age = PART3
+		set ztable.birthdate = PART4
+		
+		do ztable.bypassSave()
 
+		do OUTPUT
+	}		
+	
+	write "fff", !
+	
+	do io.close()
+	
+	quit
 
+private INITSYS
 
+	do SYSVAR^SCADRV0()
+	set %UserID = 9999
+	set %UserClass = "SCA"
+	set %UserStation = "ZEXTIMPSC"
+	
+	quit
+
+Task 
+	type String fileDirectory = "/u01/study/spool"
+	type String filesName = "TEST1.txt"
+	
+	do INPUT(fileDirectory,filesName)
+
+	quit
 
 	
 	
