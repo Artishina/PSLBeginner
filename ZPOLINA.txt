@@ -924,7 +924,7 @@ TABLEDEL
 		
 	quit
 	
-OUTPUT 
+OUTPUT
 
 	type literal String EOL = (13,10).char()
 	type literal String TAB = 9.char()
@@ -1021,30 +1021,33 @@ INPUT(String fileDirectory, String filesName)
 	type String PART1,PART2,PART3,PART4
 	type Number ZCNT = 0
 	type Boolean ZFTR = false
+	type public Boolean ER = false
 	//type Error $ECODE
 	
 	//type literal String SP = 32.char()
 	//type literal String LF = 10.char()
 	
-	for  set rec = io.read()  do {
+	for  set rec = io.read()  do {  quit:ER
 		
 		catch ex {
-			//do io.close()
-			//quit
-            		if ex'["%PSL-E-IO" throw ex     
-            		if ex["IOOPEN" write "Open failed", ! do io.close() quit
-            		if ex["IOEOF"  write "Reached end of file", ! do io.close() quit
-            		write "unexpected IO error '", ex.type, "'", !
+			write "err",!
+			do io.close()
+			
+			set ER = true
+			// Reached end of file, not reported
+			if ex.type = "%PSL-E-IOEOF" quit
 		}
 			
 		//if rec.piece(TAB) = "ftr" do {
+		
+		/*
 		if rec.beginsWith("ftr") do {
 					
 			do io.close()
 			throw Class.new("Error", "ZPOLINA-E-FATAL,"_$$^MSG(115233))
 			quit
 		}
-		
+		*/
 		set ZCNT = ZCNT + 1
 		
 		set PART1 = rec.piece(TAB,1)
@@ -1052,10 +1055,11 @@ INPUT(String fileDirectory, String filesName)
 		set PART3 = rec.piece(TAB,3)
 		set PART4 = rec.piece(TAB,4)
 	
-		write "p1 ", PART1, !
-		write "p2 ", PART2, !
-		write "p3 ", PART3, !
-		write "p4 ", PART4, !
+		write "name: ", PART1, !
+		write "city: ", PART2, !
+		write "age: ", PART3, !
+		write "birthdate ", PART4, !
+		write !
 		
 		type RecordTABLE1 ztable = Class.new("RecordTABLE1")
 		
@@ -1067,7 +1071,7 @@ INPUT(String fileDirectory, String filesName)
 		
 		do ztable.bypassSave()
 
-		do OUTPUT
+		do OUTPUT //(fileDirectory,filesName)
 	}		
 	
 	write "fff", !
@@ -1089,8 +1093,10 @@ Task
 	type String fileDirectory = "/u01/study/spool"
 	type String filesName = "TEST1.txt"
 	
+	type public Boolean ER = false
+	
 	do INPUT(fileDirectory,filesName)
-
+		
 	quit
 
 	
