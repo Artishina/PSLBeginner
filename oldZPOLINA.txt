@@ -1,0 +1,788 @@
+//DO NOT MODIFY  My first procedure|ZPOLINA|||||||1
+public ZPOLINA(String RETURN, Number VERSN, Number ACN, String CONTRACT, Boolean ZPFOLIO, Date EFD, Boolean ZBNSACC, Boolean ZSHOWNER)
+	/*
+	 ORIG: 1 - 22/11/2014
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	   
+	   14/08/2019 - Polina Borisova 
+	
+	*/
+	
+	//do test
+	
+	//quit
+	
+	
+
+	type String ERRMSG = ""
+	
+	// Rollback transaction to avoid TP restarts  
+	do Runtime.rollback()	
+	
+	do PROC
+	
+	quit ERRMSG
+	
+PROC
+
+	//type literal Number CCPrdType = 651
+
+	type public String CONTRACT, ERRMSG, RETURN = ""
+	type String CLILIST = ""	// list of clients already added to reply
+	type public Number ACN, VERSN
+	type public Boolean ZPFOLIO, ZBNSACC, ZCC, ZSHOWNER
+	type public Date EFD, ZSTFDATE
+	
+	type RecordDEP dep
+	type RecordLN ln
+	type Number CID, CNT = 0
+	
+	write "hh", !
+	
+	//write RETURN
+	
+	catch mrpcErr {
+		if mrpcErr.component = "%GTM" do LOGERR^UTLERR(mrpcErr)
+		set RETURN = ""
+		set ERRMSG = $$ERRMSG^PBSUTL(mrpcErr.description)
+	}
+	
+	set CONTRACT = CONTRACT.get()
+	set ACN = ACN.get()
+	set EFD = EFD.get().toDate(CUVAR.ZMSKD)
+	set ZBNSACC = ZBNSACC.get()
+	set ZSHOWNER = ZSHOWNER.get()
+	set ZCC = false			// Credit Card Account flag
+	
+	// Version number of client message is not compatible with server
+	if VERSN.get() <> 1 throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(2951))
+	
+	// Invalid BISquit/CIF Number Field
+	if CONTRACT.isNull() = ACN.get().isNull() throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(101020,"BISquit/CIF Number"))
+	
+	// validation for Use Portfolio input parameter
+	if ZPFOLIO.get().isNull() set ZPFOLIO = false	//default to false
+	if (ZPFOLIO'=true),(ZPFOLIO'=false) throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(101020,"Use Portfolio"))
+	
+	// validation for exctracting Bonus Accounts
+	if ZBNSACC.isNull() set ZBNSACC = false //default to false
+
+	type ResultSet rsCUVAR = Db.select("ZSTFDATE", "CUVAR")
+	if rsCUVAR.next() set ZSTFDATE = rsCUVAR.getCol("ZSTFDATE")
+
+	if EFD.isNull() set EFD = ZSTFDATE.get()
+
+	//Invalid Effective Date
+	if (EFD > ZSTFDATE.get()) ! (EFD < (ZSTFDATE.get() - 1)) throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(115110))
+
+	if ACN.isNull() do {
+		
+		if ZBNSACC {
+			
+			type RecordZBNSACC rzbnsacc = Db.getRecord("ZBNSACC","CID=:CONTRACT",1)
+			
+			// Invalid account number (account does not exist)
+			if 'rzbnsacc.getMode() throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(7822))
+			
+			do AddBnsAcc(rzbnsacc, .RETURN)
+			
+		}
+		else {
+			
+			set CID = $$GETCID^ZRPCUTL(CONTRACT)
+			if CID.isNull() set CID = $$GETCID^ZACCTUTL(CONTRACT),ZCC = true
+			
+			// Invalid account number (account does not exist)
+			if CID.isNull() throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(7822))
+			
+			if ZCC {
+				set ln = Db.getRecord("LN","CID=:CID",1)
+
+				// Invalid account number (account does not exist)
+				if 'ln.getMode() throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(7822))
+
+				// If account is credit check for temporary filter
+				type literal RecordZUTBLPARAM zutblparam = Db.getRecord("ZUTBLPARAM", "PARAMGRP = 'CREDITCARD', PARAM = 'APNDCC3INT'")
+				// Invalid account number (account does not exist)
+				if zutblparam.value.piece(":",2)="N",$$isLNCCType^ZLNUTL(ln.type) throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(7822))
+				
+				do CCDATA(ln)
+				
+				// Account is not in active or pending status
+				if CNT = 0 throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(101019))				
+			}
+			else {
+				set dep = Db.getRecord("DEP","CID=:CID",1)
+				
+				// Invalid account number (account does not exist)
+				if 'dep.getMode() throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(7822))
+				
+				do DATA(dep,ZPFOLIO)
+				
+				// Account is not in active or pending status
+				if CNT = 0 throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(101019))
+			}
+			
+		}
+	}
+	else  do {
+		
+		// STBLMSG.3079 - No customer information for customer ~p1
+		if 'Db.isDefined("CIF","ACN=:ACN") throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(3079, ACN))
+	
+		type DbSet dbs = Db.selectDbSet("DEP", "ACN=:ACN AND ZCONTRACT IS NOT NULL")
+		while dbs.next() set dep = dbs.getRecord() do {
+			
+			if dep.stat = 0 do DATA(dep,ZPFOLIO)
+		}
+
+		// Temporary filter controls addition of CC-accounts 
+		type literal RecordZUTBLPARAM zutblparam = Db.getRecord("ZUTBLPARAM", "PARAMGRP = 'CREDITCARD', PARAM = 'APNDCC3INT'")
+		if zutblparam.value.piece(":",2)'="N" do {
+				
+			// Get all Credit Cards
+			//type DbSet dbs1 = Db.selectDbSet("LN", "ACN=:ACN AND TYPE=:CCPrdType")
+			type DbSet dbs1 = Db.selectDbSet("LN", "ACN=:ACN")
+			while dbs1.next() do { 
+				set ln = dbs1.getRecord() 
+				if $$isLNCCType^ZLNUTL(ln.type) do CCDATA(ln)
+			}
+		}
+		
+		// Extract Escrow account that was previously belong to this customer
+		type ResultSet zrs2 = Db.select("CID","ZESWCESSION","ZPREVACN=:ACN")
+		type String XCID, ZDEPCID
+		while zrs2.next() do {
+			
+			set ZDEPCID = zrs2.getCol("CID")
+			
+			if XCID(ZDEPCID).get() = 1 quit		// For avoid extracting same account twice
+			set XCID(ZDEPCID) = 1
+			
+			set dep = Db.getRecord("DEP", "CID=:ZDEPCID", 1)
+			if dep.acn = ACN quit		// For avoid extracting same account twice
+			
+			do DATA(dep,ZPFOLIO, true)
+		}
+		
+		if ZBNSACC do findBnsAccounts(ACN, .RETURN)
+	
+		//write RETURN
+		
+		// No Active Deposit Accounts Linked to Customer
+		if CNT = 0 do ADDCLIENT(ACN)
+	}
+	
+	set RETURN = $$V2LV^MSG(RETURN())
+	
+	
+	write " ", !
+	write " ", !
+	write "count = ", CNT, !
+	write " ", !
+	write " ", !
+	write RETURN, !
+
+	quit //RETURN
+	
+CCDATA(RecordLN ln)
+
+	type literal String TAB = (9).char()
+	type literal String EOL = (13,10).char()
+	
+	type public Boolean ER, ZSHOWNER
+	type public String RETURN, RM, CLILIST
+	type public Number ACN,CNT
+	type public Date EFD, ZSTFDATE
+	
+	type String CRCD, IRN=""
+	type Number ZPFBAL, BAL
+	type Number ZAVLBAL, ZOWNFUND, ZTOTRQST, ZTOTLIEN
+	type Boolean ZSTOPFLAG
+	
+	type Number ZFBNEWHLD = 0, ZFBANYHLD = 0, ZTOTFBNEW = 0, ZTOTFBANY = 0
+	type Number ZDEFPMTD = 0, ZDEFFEED = 0
+	
+
+
+	// Returns available balance, own funds, REQUEST & LIEN groups holds total amount, presence of STOP group holds.	
+
+	if 'ln.phld, (EFD = ZSTFDATE) do {
+
+		set ZAVLBAL = ln.balavail + ln.STFNET
+		set ZOWNFUND = ln.zdepbal + ln.STFNET
+		set ZTOTRQST = 0
+		set ZTOTLIEN = 0
+		set ZSTOPFLAG = 0
+		set ZFBNEWHLD = 0
+		set ZFBANYHLD = 0
+	}
+	else  {
+		type RecordDEP dep1
+		do ZDEPFLDS^ZDEPCDI(.dep1, .ln, .ZAVLBAL, .ZOWNFUND, .ZTOTRQST, .ZTOTLIEN, .ZSTOPFLAG, .ZFBNEWHLD, .ZFBANYHLD, EFD)
+
+		// Returns deferred fee & payments due amount.
+		do ZDEPFLDX^ZDEPCDI(ln.cid, .ZDEFPMTD, .ZDEFFEED)
+	}
+
+	if EFD = ZSTFDATE set BAL = ln.zdepbal
+	else set BAL = $$GETLNBAL^ZDENDUTL(.ln, EFD)
+
+	if EFD = ZSTFDATE do {
+		set ZTOTFBNEW = BAL + ln.stfnet - ZFBNEWHLD	// New FBEP Available Balance (DEP.ZFBEPNEW)
+		set ZTOTFBANY = BAL + ln.stfnet - ZFBANYHLD	// Any FBEP Available Balance (DEP.ZFBEPANY)
+	}
+	else do {
+		set ZTOTFBNEW = BAL + ln.zstfnett - ZFBNEWHLD
+		set ZTOTFBANY = BAL + ln.zstfnett - ZFBANYHLD
+	}
+
+	set CRCD = ln.crcd
+	set ZPFBAL = ZAVLBAL
+	/*  NO portfolio support yet
+	if EFD = ZSTFDATE set ZPFBAL = $S(ZPFOLIO:dep.zpfavbal, 1:ZAVLBAL)
+	else set ZPFBAL = $S(ZPFOLIO:$$ZPFAVBAL^ZDEPCDI(dep.acn,dep.ccode,dep.crcd,EFD), 1:ZAVLBAL)
+	*/
+	
+	if ER.get() throw Class.new("Error","ZMRPC4002-E,"_RM.get())
+
+	// Minimum between the current value and the value as of the end of EFD.
+	if EFD = (ZSTFDATE - 1) do {
+
+		type Number ZAVLBALNW, ZOWNFUNDNW
+		if ln.phld do {
+			type RecordDEP dep1
+			type Number ZTOTRQSTNW, ZTOTLIENNW, ZFBNEWHLDNW, ZFBANYHLDNW
+			type Boolean ZSTOPFLAGNW
+			do ZDEPFLDS^ZDEPCDI(.dep1, .ln, .ZAVLBALNW, .ZOWNFUNDNW, .ZTOTRQSTNW, .ZTOTLIENNW, .ZSTOPFLAGNW, .ZFBNEWHLDNW, .ZFBANYHLDNW, ZSTFDATE)
+		}
+		else do {
+			set ZAVLBALNW = ln.zdepbal + ln.balavail + ln.STFNET
+			set ZOWNFUNDNW = ln.zdepbal + ln.STFNET
+		}
+		/* No portfolio support yet
+		if ZPFOLIO do {
+			type Number ZPFBALNW = dep.zpfavbal
+			set ZPFBAL = $S(ZPFBAL < ZPFBALNW:ZPFBAL, 1:ZPFBALNW)
+		}
+		else  
+		*/
+		set ZPFBAL = $S(ZAVLBAL < ZAVLBALNW:ZAVLBAL, 1:ZAVLBALNW)
+
+		set ZOWNFUND = $S(ZOWNFUND < ZOWNFUNDNW:ZOWNFUND, 1:ZOWNFUNDNW)
+	}
+	
+	if ER.get() throw Class.new("Error","ZMRPC4002-E,"_RM.get())
+	/* No portfolio yet
+	if ZPFOLIO do {
+
+		// No Overdraft
+		if (dep.stat=0)&(dep.crcd=%SystemCurrency)&(dep.zmaster=1)&(dep.grp="DDA")&('dep.odflg) set ZOWNFUND = ZPFBAL quit
+
+		type Number ovrdcid = ""
+		if '$$hasOverdraft^ZLNUTL(dep.acn,.ovrdcid) set ZOWNFUND = ZPFBAL quit
+
+		// Customer has active Overdraft
+		type Number ZOVRDAVLBAL = $$getOverdraftAvlBalByCID^ZLNUTL(ovrdcid)
+
+		if dep.crcd'=%SystemCurrency do {
+		
+			type Number EXCAMT = 0
+	
+			//set ZOVRDAVLBAL = $$ZPFFX^MRPC1030(2,%SystemCurrency,dep.crcd,ZOVRDAVLBAL,1)
+			do EXC^CRCDUTL(%SystemCurrency, dep.crcd, ZOVRDAVLBAL, 1, 1, "00", 2, %SystemDate, 1,,, 2)
+			if ER.get() throw Class.new("Error","ZMRPC4002-E,"_RM.get())
+			
+			set ZOVRDAVLBAL = EXCAMT.roundCur(%SystemCurrency)
+		}
+
+		set ZOWNFUND = ZPFBAL - ZOVRDAVLBAL
+	}
+	*/
+	
+	// If loan is in status 6 (Pending) "available balance" in the response must be "0" 
+	if ln.stat = 6 set ZPFBAL = 0
+	
+	type RecordLNSEG lnseg = Db.getRecord("LNSEG","CID=:ln.cid,SEGMENT=1",1)
+	if lnseg.getMode() set IRN = lnseg.irn.roundCur(ln.crcd)
+	set RETURN = RETURN_"DEP-IDENT_LN"_TAB_ln.zccuracc
+	set RETURN = RETURN_TAB_""
+	set RETURN = RETURN_TAB_ln.type
+	set RETURN = RETURN_TAB_ln.typedes
+	set RETURN = RETURN_TAB_ln.boo
+	set RETURN = RETURN_TAB_ln.brreg
+	set RETURN = RETURN_TAB_ln.cc
+	set RETURN = RETURN_TAB_CRCD
+
+	type Number CCBAL
+	if EFD = ZSTFDATE set CCBAL = ln.zccbal
+	else  do {
+		set CCBAL = $$EFDBAL(ln.cid, EFD)
+		if CCBAL < 0 set CCBAL = 0
+	}
+	set RETURN = RETURN_TAB_CCBAL
+	set RETURN = RETURN_TAB_ZPFBAL.roundCur(CRCD)
+	set RETURN = RETURN_TAB_ZOWNFUND.roundCur(CRCD)
+	set RETURN = RETURN_TAB_ZTOTLIEN.roundCur(CRCD)
+	set RETURN = RETURN_TAB_ZTOTRQST.roundCur(CRCD)
+	set RETURN = RETURN_TAB_$select(ln.zstat0chgdt.isNull():ln.odt, 1:ln.zstat0chgdt)	// date_account_opened
+	set RETURN = RETURN_TAB_ln.stat
+	set RETURN = RETURN_TAB_ln.dtc
+	set RETURN = RETURN_TAB_ZDEFPMTD.roundCur(CRCD)
+	set RETURN = RETURN_TAB_ZDEFFEED.roundCur(CRCD)
+	set RETURN = RETURN_TAB_ZSTOPFLAG
+	set RETURN = RETURN_TAB_""
+	set RETURN = RETURN_TAB_""
+	set RETURN = RETURN_TAB_""
+	set RETURN = RETURN_TAB_""
+	set RETURN = RETURN_TAB_ZTOTFBANY.roundCur(CRCD)
+	set RETURN = RETURN_TAB_0
+
+	// Overdraft fields
+	set RETURN = RETURN_TAB_ln.stat
+	set RETURN = RETURN_TAB_ln.crlmt
+	set RETURN = RETURN_TAB_ln.odt						// overdraft_start_date
+	set RETURN = RETURN_TAB_ln.mdt
+	set RETURN = RETURN_TAB_ln.zcontract
+	set RETURN = RETURN_TAB_IRN
+	set RETURN = RETURN_TAB_ln.zpmtdt					// overdraft_payment_date
+	set RETURN = RETURN_TAB_ln.zcupr2.roundCur(ln.crcd)			// overdraft_due_current_period
+	set RETURN = RETURN_TAB_ln.zcuin2.roundCur(ln.crcd)			// overdraft_due_interest
+	set RETURN = RETURN_TAB_ln.zunpr2.roundCur(ln.crcd)			// overdraft_overdue_current_period
+	set RETURN = RETURN_TAB_ln.zunin2.roundCur(ln.crcd)			// overdraft_overdue_interest
+	set RETURN = RETURN_TAB_ln.lchg.roundCur(ln.crcd)
+	set RETURN = RETURN_TAB_(ln.zcuin2 + ln.zcupr2).roundCur(ln.crcd)	// overdraft_min_payment
+	set RETURN = RETURN_TAB_ln.ztobal.roundCur(ln.crcd)			// unauthorized_overdraft_penalty
+	
+	set RETURN = RETURN_TAB_0 //$select(dep.zsitcidflg=1:"1",1:"0")
+	
+	set RETURN = RETURN_TAB_0 //dep.zisfmmanaged
+	
+	set RETURN = RETURN_TAB_TAB
+	
+	// Temporary patch which is needed to launch accounts non-mirrored in Bisquit.
+	// For LN account there is no data to return because for 651 we shall not return anything
+	// and for other LNs there are just no accounts for which information is returned
+	set RETURN = RETURN_TAB_TAB_TAB
+	
+	set RETURN = RETURN_TAB_ln.poam.roundCur(ln.crcd)	// cc_total_payoff_amount
+	set RETURN = RETURN_TAB_ln.zintgrcend			// cc_grace_end_date
+	set RETURN = RETURN_TAB_ln.zcuin2.roundCur(ln.crcd)	// cc_accrued_interest
+
+	set RETURN = RETURN_TAB_ln.acn 
+	
+	set RETURN = RETURN_EOL
+
+	// Account counter
+	set CNT = CNT + 1
+
+	if ZSHOWNER do ADDCLIENT(ln.acn)
+
+	quit
+	
+DATA(RecordDEP dep, Boolean ZPFOLIO, Boolean CESSION)
+
+	type literal String TAB = (9).char()
+	type literal String EOL = (13,10).char()
+	
+	type public Boolean ER, ZSHOWNER
+	type public String RETURN, RM, CLILIST
+	type public Number ACN,CNT
+	type public Date EFD, ZSTFDATE
+	
+	type String CRCD
+	type Number ZPFBAL, BAL
+	type Number ZAVLBAL, ZOWNFUND, ZTOTRQST, ZTOTLIEN
+	type Boolean ZSTOPFLAG
+	
+	type Number ZFBNEWHLD = 0, ZFBANYHLD = 0, ZTOTFBNEW = 0, ZTOTFBANY = 0
+	type Number ZDEFPMTD = 0, ZDEFFEED = 0
+	
+	type RecordLN ln1
+	
+	// Returns available balance, own funds, REQUEST & LIEN groups holds total amount, presence of STOP group holds.	
+
+	if 'dep.phld, EFD = ZSTFDATE do {
+
+		set ZAVLBAL = dep.BAL + dep.STFNET
+		if dep.odflg set ZAVLBAL = ZAVLBAL + $$getOverdraftAvlBalByCID^ZLNUTL(dep.odfacn)
+
+		if 'dep.ODLIM.isNull(), dep.ODLIM <> 0, (dep.ODEXP.isNull() ! (dep.ODEXP > ZSTFDATE)) set ZAVLBAL = ZAVLBAL + dep.ODLIM
+		set ZOWNFUND = dep.BAL + dep.STFNET
+		set ZTOTRQST = 0
+		set ZTOTLIEN = 0
+		set ZSTOPFLAG = 0
+		set ZFBNEWHLD = 0
+		set ZFBANYHLD = 0
+	}
+	else  {
+		
+		do ZDEPFLDS^ZDEPCDI(.dep, .ln1, .ZAVLBAL, .ZOWNFUND, .ZTOTRQST, .ZTOTLIEN, .ZSTOPFLAG, .ZFBNEWHLD, .ZFBANYHLD, EFD)
+
+		// Returns deferred fee & payments due amount.
+		do ZDEPFLDX^ZDEPCDI(dep.cid, .ZDEFPMTD, .ZDEFFEED)
+	}
+
+	if EFD = ZSTFDATE set BAL = dep.bal
+	else set BAL = $$GETDEPBAL^ZDENDUTL(dep, EFD)
+
+	if EFD = ZSTFDATE do {
+		set ZTOTFBNEW = BAL + dep.stfnet - ZFBNEWHLD	// New FBEP Available Balance (DEP.ZFBEPNEW)
+		set ZTOTFBANY = BAL + dep.stfnet - ZFBANYHLD	// Any FBEP Available Balance (DEP.ZFBEPANY)
+	}
+	else do {
+		set ZTOTFBNEW = BAL + dep.zstfnett - ZFBNEWHLD
+		set ZTOTFBANY = BAL + dep.zstfnett - ZFBANYHLD
+	}
+
+	set CRCD = dep.crcd
+	if EFD = ZSTFDATE set ZPFBAL = $S(ZPFOLIO:dep.zpfavbal, 1:ZAVLBAL)
+	else set ZPFBAL = $S(ZPFOLIO:$$ZPFAVBAL^ZDEPCDI(dep.acn,dep.ccode,dep.crcd,EFD), 1:ZAVLBAL)
+	
+	if ER.get() throw Class.new("Error","ZMRPC4002-E,"_RM.get())
+
+	// Minimum between the current value and the value as of the end of EFD.
+	if EFD = (ZSTFDATE - 1) do {
+
+		type Number ZAVLBALNW, ZOWNFUNDNW
+		if dep.phld do {
+			type Number ZTOTRQSTNW, ZTOTLIENNW, ZFBNEWHLDNW, ZFBANYHLDNW
+			type Boolean ZSTOPFLAGNW
+			do ZDEPFLDS^ZDEPCDI(.dep, .ln1, .ZAVLBALNW, .ZOWNFUNDNW, .ZTOTRQSTNW, .ZTOTLIENNW, .ZSTOPFLAGNW, .ZFBNEWHLDNW, .ZFBANYHLDNW, ZSTFDATE)
+		}
+		else do {
+			set ZAVLBALNW = dep.BAL + dep.STFNET
+			if 'dep.ODLIM.isNull(), dep.ODLIM <> 0, (dep.ODEXP.isNull() ! (dep.ODEXP > ZSTFDATE)) set ZAVLBALNW = ZAVLBALNW + dep.ODLIM
+			set ZOWNFUNDNW = dep.BAL + dep.STFNET
+		}
+		if ZPFOLIO do {
+			type Number ZPFBALNW = dep.zpfavbal
+			set ZPFBAL = $S(ZPFBAL < ZPFBALNW:ZPFBAL, 1:ZPFBALNW)
+		}
+		else  set ZPFBAL = $S(ZAVLBAL < ZAVLBALNW:ZAVLBAL, 1:ZAVLBALNW)
+
+		set ZOWNFUND = $S(ZOWNFUND < ZOWNFUNDNW:ZOWNFUND, 1:ZOWNFUNDNW)
+	}
+	
+	if ER.get() throw Class.new("Error","ZMRPC4002-E,"_RM.get())
+
+	if ZPFOLIO do {
+
+		// No Overdraft
+		if (dep.stat=0)&(dep.crcd=%SystemCurrency)&(dep.zmaster=1)&(dep.grp="DDA")&('dep.odflg) set ZOWNFUND = ZPFBAL quit
+
+		type Number ovrdcid = ""
+		if '$$hasOverdraft^ZLNUTL(dep.acn,.ovrdcid) set ZOWNFUND = ZPFBAL quit
+
+		// Customer has active Overdraft
+		type Number ZOVRDAVLBAL = $$getOverdraftAvlBalByCID^ZLNUTL(ovrdcid)
+
+		if dep.crcd'=%SystemCurrency do {
+		
+			type Number EXCAMT = 0
+	
+			//set ZOVRDAVLBAL = $$ZPFFX^MRPC1030(2,%SystemCurrency,dep.crcd,ZOVRDAVLBAL,1)
+			do EXC^CRCDUTL(%SystemCurrency, dep.crcd, ZOVRDAVLBAL, 1, 1, "00", 2, %SystemDate, 1,,, 2)
+			if ER.get() throw Class.new("Error","ZMRPC4002-E,"_RM.get())
+			
+			set ZOVRDAVLBAL = EXCAMT.roundCur(%SystemCurrency)
+		}
+
+		set ZOWNFUND = ZPFBAL - ZOVRDAVLBAL
+	}
+	
+	// Derive account status
+	type String ZDEPSTAT = dep.stat
+	if CESSION.get() set ZDEPSTAT = 109
+
+	set RETURN = RETURN_"DEP-IDENT_DEP"_TAB_dep.zcontract_TAB_dep.zmaster_TAB_dep.type_TAB_dep.typedes_TAB_dep.boo_TAB_"AAAAAAAAA"
+	set RETURN = RETURN_TAB_dep.brreg_TAB_dep.cc_TAB_CRCD_TAB_BAL.roundCur(CRCD)_TAB_ZPFBAL.roundCur(CRCD)
+	set RETURN = RETURN_TAB_ZOWNFUND.roundCur(CRCD)_TAB_ZTOTLIEN.roundCur(CRCD)_TAB_ZTOTRQST.roundCur(CRCD)_TAB_dep.odt_TAB_ZDEPSTAT
+	set RETURN = RETURN_TAB_dep.dtc_TAB_ZDEFPMTD.roundCur(CRCD)_TAB_ZDEFFEED.roundCur(CRCD)_TAB_ZSTOPFLAG_TAB_dep.zdtc
+	set RETURN = RETURN_TAB_dep.index_TAB_dep.zpirn_TAB_dep.znirn_TAB_ZTOTFBANY.roundCur(CRCD)_TAB_dep.zmir_TAB
+	
+	// Overdraft field
+	if dep.odflg do {
+
+		type ResultSet depodp = Db.select("ODACN,PRI", "DEPODP", "CID=:dep.cid")
+		type Number zlncid = ""
+
+		while depodp.next() do {
+
+			if (depodp.getCol("PRI")=1) set zlncid = depodp.getCol("ODACN") quit			
+		}
+		
+		if zlncid.isNull() do fillEmptyOverdraft(.RETURN, TAB) quit
+
+		type RecordLN ln = Db.getRecord("LN", "CID=:zlncid", 1)
+	 	if 'ln.getMode() do fillEmptyOverdraft(.RETURN, TAB) quit
+
+		type Number zminpmnt = ln.cupr + ln.cuin
+		type Number zunovrpen = dep.resint
+
+		set RETURN = RETURN_ln.stat_TAB_ln.crlmt_TAB_ln.odd_TAB_ln.dtc_TAB_" DDDDDDDD"
+		set RETURN = RETURN_TAB_ln.zkod_TAB_ln.irn_TAB_ln.schnd
+		
+		set RETURN = RETURN_TAB_(ln.bal - ln.unpr).roundCur(ln.crcd)_TAB	// overdraft_due_current_period
+		set RETURN = RETURN_(ln.acr - ln.unin).roundCur(ln.crcd)_TAB		// overdraft_due_interest
+		set RETURN = RETURN_ln.unpr.roundCur(ln.crcd)_TAB
+		set RETURN = RETURN_ln.unin.roundCur(ln.crcd)_TAB
+		set RETURN = RETURN_ln.lchg.roundCur(ln.crcd)_TAB
+		set RETURN = RETURN_zminpmnt.roundCur(ln.crcd)_TAB
+		set RETURN = RETURN_zunovrpen.roundCur(ln.crcd)
+	}
+	else do {
+
+		do fillEmptyOverdraft(.RETURN, TAB)
+	}
+	
+	set RETURN = RETURN_TAB_$select(dep.zsitcidflg=1:"1",1:"0")
+	
+	set RETURN = RETURN_TAB_dep.zisfmmanaged
+	
+	if dep.zisfmmanaged do {
+		
+		set RETURN = RETURN_TAB_dep.zfmacctyp
+		
+		if ACN.isNull() do {
+			type RecordZDEPFM zdepfm = Db.getRecord("ZDEPFM", "CID=:dep.cid")
+		 	if zdepfm.getMode() set RETURN = RETURN_TAB_zdepfm.data
+		 	else  set RETURN = RETURN_TAB
+		}
+	}
+	else  set RETURN = RETURN_TAB_TAB
+
+	// Temporary patch which is needed to launch accounts non-mirrored in Bisquit.
+	// For a DEP account we shall return:
+	// 	3 empty fields for escrow accounts because for them we have full information in Profile
+	//		(so SOID will go to Profile and ask for a statement)
+	// 	3 filled fields for all other DEP accounts indicating migration from Bisquit to Profile,
+	//		(so SOID will do to Bisquit assuming that entire history lies in Bisquit).
+	
+	type public Cache %CACHE()
+	
+	// Invalid product type
+	type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:dep.type", 1)
+	if 'prodctl.getMode() throw Class.new("Error","ZMRPC4002-E-INVALID,"_$$^MSG(1503))
+	
+	type Boolean ZMIGRF = prodctl.zmigrf
+	
+	if ((ZMIGRF.isNull()) ! (ZMIGRF=0)) {
+		
+		type String ZBIC = ""
+		type RecordUTBLCCNTR zcc = Db.getRecord("UTBLCCNTR","CC=:dep.cc",1)			// get Russian BIC
+		if zcc.getMode() set ZBIC = zcc.zbic
+		set RETURN = RETURN_TAB_dep.zcontract_TAB_ZBIC_TAB_%SystemDate.toString(CUVAR.ZMSKD)
+	}
+	else  set RETURN = RETURN_TAB_TAB_TAB
+	
+	// For DEP account there is no data to return
+	set RETURN = RETURN_TAB_TAB_TAB	// cc_total_payoff_amount, cc_grace_end_date, cc_accrued_interest
+
+	set RETURN = RETURN_TAB_dep.acn
+		
+	set RETURN = RETURN_EOL
+
+	// Account counter
+	set CNT = CNT + 1
+	
+	if ZSHOWNER do {
+		if dep.type="201" do {
+			do ADDOWNERS(dep.cid, dep.acn, dep.odt, dep.dtc, dep.zcontract)
+		}
+		else  do ADDCLIENT(dep.acn)
+	}
+
+	quit
+
+private fillEmptyOverdraft(String RETURN, String TAB)
+
+	set RETURN = RETURN_TAB_TAB_TAB_TAB_TAB_TAB_TAB_TAB_TAB_TAB_TAB_TAB
+	set RETURN = RETURN_TAB
+
+	quit
+
+	
+private findBnsAccounts(Number ZACN, String RETURN)
+	
+	type public Number CNT
+	
+	type DbSet dbsetzbnsacc = Db.selectDbSet("ZBNSACC", "ACN=:ZACN")
+	while dbsetzbnsacc.next() do {
+		
+		type RecordZBNSACC zbnsacc = dbsetzbnsacc.getRecord("ZBNSACC")
+		
+		do AddBnsAcc(zbnsacc, .RETURN)
+		
+		// Account counter
+		set CNT = CNT + 1
+	}		
+	
+	quit 
+	
+	
+AddBnsAcc(RecordZBNSACC ZBNSACCREC, String RETURN)
+	
+	/*
+		Add one entity of bonus account to response 
+	*/
+
+	type literal String TAB = (9).char()
+	type literal String EOL = (13,10).char()	
+	
+	type String ZBNSDESC = ""	
+	
+	type RecordZUTBLBNACTYP utblbnactyp = Db.getRecord("ZUTBLBNACTYP","BNSACCTYPE=:ZBNSACCREC.BNSACCTYPE",1)
+	if utblbnactyp.getMode() set ZBNSDESC = utblbnactyp.desc
+	else  set ZBNSDESC = ""
+	
+	set RETURN = RETURN_"DEP-IDENT"_TAB_ ZBNSACCREC.CID.extract(1,20) 
+	set RETURN = RETURN_TAB_ "0" _TAB_ ZBNSACCREC.BNSACCTYPE _TAB_ ZBNSDESC.get() _TAB_TAB
+	set RETURN = RETURN_TAB_TAB_ "RUB" _TAB_TAB_ ZBNSACCREC.BAL _TAB
+	set RETURN = RETURN_TAB_TAB_TAB_ "2018-01-01" _TAB_ "0" _TAB
+	set RETURN = RETURN_TAB_TAB_TAB_TAB_TAB
+	set RETURN = RETURN_TAB_TAB_TAB_TAB_TAB
+	
+	do fillEmptyOverdraft(.RETURN, TAB)
+	
+	set RETURN = RETURN_TAB_EOL
+		
+ 	quit
+
+public ADDCLIENT(Number CIFID)	// AlexSh
+
+	type literal String TAB = (9).char()
+	type literal String EOL = (13,10).char()
+	
+	type public String RETURN, CLILIST
+	if CLILIST.contains(CIFID) quit		// we already returned data for this client
+	set CLILIST=CLILIST_","_CIFID
+	
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:CIFID", 1)
+	if 'cif.getMode() quit 
+	
+	set RETURN = RETURN_"CLIENT-INFO"_TAB_CIFID_TAB_cif.taxid_TAB_cif.dob_TAB_cif.zlocb_TAB
+	if cif.pasnum.isNull() do {
+		type String DULT=""
+		if 'cif.adtlidt.isNull() {
+			type RecordUTBLADTLIDT rdul = Db.getRecord("UTBLADTLIDT","IDTYP=:cif.adtlidt",1)
+			if rdul.getMode() set DULT=rdul.code
+		}
+		set RETURN=RETURN_DULT_TAB_cif.adtlidtn_TAB_cif.adtlidtissdt_TAB
+	}
+	else set RETURN=RETURN_"21"_TAB_cif.pasnum_TAB_cif.pisdt_TAB	// 21=passportRF
+	set RETURN=RETURN_cif.lnm_TAB_cif.fname_TAB_cif.mname
+	set RETURN=RETURN_EOL	
+
+	quit
+
+public ADDOWNERS(Number CID, Number ACN, Date ODT, Date DTC, String ZCONTRACT)	// AlexSh
+
+	type literal String TAB = (9).char()
+	type literal String EOL = (13,10).char()
+	
+	type public String RETURN, CLILIST
+	type String CESSIONS(,)
+	type Number N=1, i
+	
+	set CESSIONS(1,1) = ACN
+	set CESSIONS(1,2) = $SELECT(DTC.isNull():"", 1:DTC)
+	
+	type ResultSet RS = Db.select("ZREGDT,ZPREVACN","ZESWCESSION","CID=:CID AND ZCESREPTYP='11'","ZSEQ DESC")	// Added ZCESREPTYP clarification by E. Semenenko and A. Shelkov
+	while RS.next() do { 
+		set N = N + 1
+		set CESSIONS(N, 1) = RS.getCol("ZPREVACN")
+		set CESSIONS(N, 2) = RS.getCol("ZREGDT")
+	}
+	
+	if N=1 do { 			// !!! do not write in same line because ELSE block is executed in this case
+		do ADDCLIENT(ACN)	// only one owner, no ownership changes, no necessity in OWNER-INFO blocks
+	}
+	else  do {
+		set CESSIONS(N+1,2) = ODT
+		for i=N:-1:1 do {
+			set RETURN = RETURN_"OWNER-INFO"_TAB_ZCONTRACT_TAB_CESSIONS(i,1)_TAB
+			set RETURN = RETURN_CESSIONS(i+1,2)_TAB
+			set RETURN = RETURN_$SELECT((i=1):CESSIONS(1,2), 1:(+CESSIONS(i,2)-1))
+			set RETURN = RETURN_EOL
+			do ADDCLIENT(CESSIONS(i,1))
+		}
+	}
+
+	quit
+
+public INIT()
+
+	/*
+	 Output Parameter Initialization for the Interface INT_71
+	 
+	 RETURNS:
+	 . $$		Output Parameter Initialization String		/TYP=T
+	 
+	*/
+
+	type literal String EOL = (13,10).char()
+	type literal String T = 9.char()
+	type String RET
+
+	set RET = "DEP-IDENT"_T_"bisquit_account;master_account;product_type;product_type_description;owner_branch;account_region;"
+	set RET = RET_"cost_center;currency_code;ledger_balance;available_balance;own_funds;"
+	set RET = RET_"lien_amount;funds_blocked;date_account_opened~D;account_status;date_account_closed~D;"
+	set RET = RET_"deferred_payment_amount;deferred_fee_amount;account_suspend_flag;scheduled_closeout_date~D;interest_index;"
+	set RET = RET_"interest_rate;negative_unauthorized_interest_rate;fbep_any_balance;ZMIR;"
+
+	// The rest of fields is dedicated to Overdraft (CR#626)
+	set RET = RET_"overdraft_status;overdraft_limit_amount;overdraft_start_date~D;"
+	set RET = RET_"overdraft_end_date~D;kod_number;overdraft_interest_rate;"
+	set RET = RET_"overdraft_payment_date~D;overdraft_due_current_period;"
+	set RET = RET_"overdraft_due_interest;overdraft_overdue_current_period;"
+	set RET = RET_"overdraft_overdue_interest;overdraft_overdue_penalty;"
+	set RET = RET_"overdraft_min_payment;unauthorized_overdraft_penalty;"
+
+	// Standing Instruction (CR#748)
+	set RET = RET_"regular_payment_flag;"
+	
+	// FM-managed (CR#853)
+	set RET = RET_"DEP.ISFMMANAGED;"
+	set RET = RET_"DEP.FMACCTYP;"
+	set RET = RET_"DEPFM.DATA;"
+
+	// Additional Tags for Migrated Accounts (CR#1023)
+	set RET = RET_"AccountIDBeforeMigration;"
+	set RET = RET_"BICBeforeMigration;"
+	set RET = RET_"DateOfMigration~D;"
+	
+	// Addional Fields for CC (CR#1038)
+	set RET = RET_"cc_total_payoff_amount;cc_grace_end_date~D;cc_accrued_interest;"
+	
+	// CIF ID
+	set RET = RET_"Client.ACN"_EOL
+
+ 	SET RET = RET_"OWNER-INFO"_T_"account;owner;owner_start_date~D;owner_end_date~D"_EOL
+ 	SET RET = RET_"CLIENT-INFO"_T_"Client;INNPerson;BirthDate~D;BirthPlace;CustomerDocumentType;CustomerDocumentSerNum;"
+ 	SET RET = RET_"CustomerDocumentDate~D;FamilyNamePerson;FirstNamePerson;MiddleNamePerson"
+	
+	quit RET
+
+EFDBAL(Number CID, Date EFD)
+	
+	type Boolean BREAK  = false
+	type Number  ENDBAL = ""
+		
+	// Loop through account history to compute the EFD ending balance
+ 	type ResultSet rs = Db.select("TJD,ITC,ENDBAL", "HIST", "CID = :CID", "TSEQ DESC")
+	while rs.next() do { quit:BREAK
+		
+		type Row hist = rs.getRow()	
+		
+		if ENDBAL.isNull() , 'hist.itc.isNull() , '(hist.tjd > EFD) set ENDBAL = hist.endbal, BREAK = true quit
+	}
+	
+	quit +ENDBAL
