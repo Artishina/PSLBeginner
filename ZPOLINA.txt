@@ -889,14 +889,13 @@ INPUT0
 		type RecordTABLE1 ztable = Class.new("RecordTABLE1")
 		
 		set ztable.id = Db.nextVal("TABLE1")
+		set ztable.id = id
 		set ztable.zname = PART1
 		set ztable.city = PART2
 		set ztable.age = PART3
 		set ztable.birthdate = PART4
 		
-		do ztable.bypassSave()
-		
-		do OUTPUT	
+		do ztable.bypassSave()	
 		
 		//else throw Class.new("Error", "ZPOLINA-E-FATAL,"_$$^MSG(115233))
 	}	
@@ -924,17 +923,18 @@ TABLEDEL
 		
 	quit
 	
-OUTPUT
+OUTPUT(String fileDirectory, String filesName)
 
 	type literal String EOL = (13,10).char()
 	type literal String TAB = 9.char()
+	
 	type String rec,ZNAME,ZAGE,ZBD,ZCITY
 	type Number ZRECNT,ZRECERR,ZRECEM
 	
 	type IO io = Class.new("IO")
 
-	set io.directory = "/u01/study/spool"
-	set io.fileName = "TEST2.LOG"
+	set io.directory = fileDirectory //"/u01/study/spool"
+	set io.fileName = filesName //"TEST2.LOG"
 	set io.openParams = "NEWV/WRITE"
 	
 	set io.timeout = 5
@@ -992,12 +992,19 @@ OUTPUT
 
 	quit	
 
-INPUT(String fileDirectory, String filesName)
+INPUT(String fileDirectory)
+
+	type literal String TAB = 9.char()
+	type literal String filesName = "TEST1.txt"
+	
+	type String rec
+	type Number ZCNT = 0
+	type Boolean ZFTR = false
 	
 	type IO io = Class.new("IO")
 
-	set io.directory = fileDirectory //"/u01/study/spool" 
-	set io.fileName = filesName //"TEST1.txt"
+	set io.directory = fileDirectory 
+	set io.fileName = filesName
 	set io.openParams = "READ"
 	
 	set io.timeout = 5
@@ -1006,75 +1013,28 @@ INPUT(String fileDirectory, String filesName)
 	
 	do io.open()
 	
-	catch ioxcpt {
-		do io.close()
-     	 	if ioxcpt'["%PSL-E-IO" quit
-     	 	throw ioxcpt
-
-     	 	write "Open failed: ", ioxcpt.type, !
+	catch ex {
+		do OUTPUT(fileDirectory,filesName)
+		if 'io.device.isNull() do io.close()
 	}
 	
-	do INITSYS
-	
-	type literal String TAB = 9.char()
-	type String rec
-	type String PART1,PART2,PART3,PART4
-	type Number ZCNT = 0
-	type Boolean ZFTR = false
-	type public Boolean ER = false
-	//type Error $ECODE
-	
-	//type literal String SP = 32.char()
-	//type literal String LF = 10.char()
-	
-	for  set rec = io.read()  do {  quit:ER
+	for  set rec = io.read()  do {  
 		
-		catch ex {
-			write "err",!
-			do io.close()
-			
-			set ER = true
-			// Reached end of file, not reported
-			if ex.type = "%PSL-E-IOEOF" quit
-		}
-			
-		//if rec.piece(TAB) = "ftr" do {
-		
-		/*
-		if rec.beginsWith("ftr") do {
-					
-			do io.close()
-			throw Class.new("Error", "ZPOLINA-E-FATAL,"_$$^MSG(115233))
-			quit
-		}
-		*/
 		set ZCNT = ZCNT + 1
-		
-		set PART1 = rec.piece(TAB,1)
-		set PART2 = rec.piece(TAB,2)
-		set PART3 = rec.piece(TAB,3)
-		set PART4 = rec.piece(TAB,4)
-	
-		write "name: ", PART1, !
-		write "city: ", PART2, !
-		write "age: ", PART3, !
-		write "birthdate ", PART4, !
-		write !
 		
 		type RecordTABLE1 ztable = Class.new("RecordTABLE1")
 		
 		set ztable.id = Db.nextVal("TABLE1")
-		set ztable.zname = PART1
-		set ztable.city = PART2
-		set ztable.age = PART3
-		set ztable.birthdate = PART4
 		
-		do ztable.bypassSave()
-
-		do OUTPUT //(fileDirectory,filesName)
+		set ztable.zname = rec.piece(TAB,1)
+		set ztable.city = rec.piece(TAB,2)
+		set ztable.age = rec.piece(TAB,3)
+		set ztable.birthdate = rec.piece(TAB,4)
+		
+		do ztable.save()
 	}		
 	
-	write "fff", !
+	do OUTPUT(fileDirectory,filesName)
 	
 	do io.close()
 	
@@ -1093,13 +1053,71 @@ Task
 	type String fileDirectory = "/u01/study/spool"
 	type String filesName = "TEST1.txt"
 	
-	type public Boolean ER = false
+	//do INPUT(fileDirectory,filesName)
 	
-	do INPUT(fileDirectory,filesName)
+	// TEST2.LOG
 		
 	quit
+	
+LOADINPATH	
+	
+	do Runtime.rollback()
+	
+	do INITSYS
+	
+	type literal String EXT = ".LOG"
+	type literal String DefName = "OUTPUT"
+	
+	type public Boolean ERROR = false
+	type public String SCRHDR = "ZPOLINA"
 
+	type String DROPDOWN(), %READ, %TAB(), VFMQ
+	type String fileDirectory,filesName
 	
+	//type literal String fileDirectory,filesName
 	
+	catch ex {
+		set ERROR = true	
+	}
 	
+	set DROPDOWN("/u01/study/spool")="study"
+	set DROPDOWN("/u01/vtbdevnew/spool")="vtbdevnew"
+
+	set %TAB("fileDirectory")="/DES=Enter Directory's name/TYP=T/LEN=200/REQ/TBL=DROPDOWN("
+	set %TAB("filesName")="/DES=Enter File's name/TYP=T/LEN=200/REQ"
+	set %READ="@@%FN,,@SCRHDR/CEN,fileDirectory/REQ,filesName/NOREQ"
 	
+	do ^UTLREAD if ERROR.get() !(VFMQ="Q")
+	
+	write filesName, !
+	write fileDirectory, !
+	
+	//do LOADINPROC(filesName)
+	
+	if filesName.isNull() set filesName = DefName
+	
+	set filesName = filesName_EXT
+		
+	do INPUT(fileDirectory)
+	do OUTPUT(fileDirectory,filesName)
+	
+	quit	
+	
+GET 
+	type String zpar,zval
+	type literal String x = CUVAR.%MCP
+	
+	type ResultSet rs = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP = 'POLINATEST'")
+
+	while rs.next()  do {
+       		set zpar = rs.getCol("PARAM")
+      		set zval = rs.getCol("VALUE")
+      		
+      		write "zpar = ",zpar, !
+      		write "zval = ",zval, !
+       }
+       
+       write "x ",x, !
+	
+	quit
+
