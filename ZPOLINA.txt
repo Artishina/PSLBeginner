@@ -1,5 +1,5 @@
 //DO NOT MODIFY  My first procedure|ZPOLINA|||||||1
-public ZPOLINA(String RETURN, Number VERSN, Number ACN, String CONTRACT, Boolean ZPFOLIO, Date EFD, Boolean ZBNSACC, Boolean ZSHOWNER)
+//public ZPOLINA(String RETURN, Number VERSN, Number ACN, String CONTRACT, Boolean ZPFOLIO, Date EFD, Boolean ZBNSACC, Boolean ZSHOWNER)
 	/*
 	 ORIG: 1 - 22/11/2014
 	 DESC: 
@@ -21,10 +21,10 @@ public ZPOLINA(String RETURN, Number VERSN, Number ACN, String CONTRACT, Boolean
 	
 	
 
-	type String ERRMSG = ""
+	//type String ERRMSG = ""
 	
 	// Rollback transaction to avoid TP restarts  
-	do Runtime.rollback()	
+	//do Runtime.rollback()	
 	
 	//do PROC
 	
@@ -165,15 +165,6 @@ INPUT(String fileDirectory)
 	
 	quit
 
-private INITSYS
-
-	do SYSVAR^SCADRV0()
-	set %UserID = 9999
-	set %UserClass = "SCA"
-	set %UserStation = "ZEXTIMPSC"
-	
-	quit
-
 Task 
 	type String fileDirectory = "/u01/study/spool"
 	type String filesName = "TEST1.txt"
@@ -198,8 +189,6 @@ LOADINPATH
 
 	type String DROPDOWN(), %READ, %TAB(), VFMQ
 	type String fileDirectory,filesName
-	
-	//type literal String fileDirectory,filesName
 	
 	catch ex {
 		set ERROR = true	
@@ -228,81 +217,91 @@ LOADINPATH
 	
 	quit	
 	
-GET 
-	type String ZNAME,ZBD,ZCITY,ZAGE
-	type String zpar,zval
-	type literal String x = CUVAR.%MCP
-	
-	
-/*	
-	type literal ResultSet rs = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP = 'POLINATEST'")
-	
-	#while rs.next()
-		set zpar = rs.getCol("PARAM")
-      		set zval = rs.getCol("VALUE")
-      		
-      		write "zpar = ",zpar, !
-      		write "zval = ",zval, !
-	#end
-	
-	//write zpar,!
-	
-	quit 0
-	
+GET
 
-
-	while rs.next()  do {
-       		set zpar = rs.getCol("PARAM")
-      		set zval = rs.getCol("VALUE")
-      		
-      		write "zpar = ",zpar, !
-      		write "zval = ",zval, !
-       }
-    */   
-       //write "x ",x, !
+	do Runtime.rollback()
 	
-	//quit
-
-GET0
+	do INITSYS
 		
-	//write "hist ",hist.value,!
-		
-	type literal Number ZCID = 1100001809
-	type literal Number ZTSEQ = 2
-	type String TAMT
-	
-	type literal RecordHIST hist = Db.getRecord("HIST","CID=:ZCID,TSEQ=:ZTSEQ")
-
-	set TAMT = hist.tamt
-
-	write "tamt ",TAMT,!
-	
-	quit
-	
-GET1
+	type literal String DefName = "OUTPUT"
+	type literal String DefDir = "/u01/study/spool"
+	type literal String DefExt = "LOG"
 	type literal String ZPGRP = "POLINATEST"
-	type literal String ZPAR = "DIR"
-	type String val
+	type literal String ZPARD = "DIR"
+	type literal String ZPAR = "FILEEXT" 
 		
-	type literal RecordZUTBLPARAM hist = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR")
-		
-	set val = hist.value
+	type literal RecordZUTBLPARAM dir = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPARD",1)		
 	
-	write "val ",val,!
+	#IF 'dir.value.isNull() 
+		type literal String dirv = dir.value
+	#ELSE 
+		type literal String dirv = DefDir
+
+	#END
+
+	
+	type literal RecordZUTBLPARAM ext = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)		
+	
+	#IF 'ext.value.isNull() 
+		type literal String extv = ext.value
+	#ELSE 
+		type literal String extv = DefExt
+
+	#END
+	
+	type public String SCRHDR = "ZPOLINA"
+
+	type String DROPDOWN(), %READ, %TAB(), VFMQ
+	type String fileDirectory,filesName
+	
+	set fileDirectory = dirv
+	
+	set DROPDOWN(dirv)="study"
+	set DROPDOWN("/u01/vtbdevnew/spool")="vtbdevnew"
+
+	set %TAB("fileDirectory")="/DES=Enter Directory's name/TYP=T/LEN=200/REQ/TBL=DROPDOWN("
+	set %TAB("filesName")="/DES=Enter File's name/TYP=T/LEN=200/REQ"
+	set %READ="@@%FN,,@SCRHDR/CEN,fileDirectory/REQ,filesName/NOREQ"
+	
+	do ^UTLREAD if ER.get() !(VFMQ="Q")
+	
+	if filesName.isNull() set filesName = DefName
+	
+	set filesName = filesName_"."_extv
+	
+	do LOADINPROC	
+	
+	write "Output file: ",filesName, !
+	write "Directory: ",fileDirectory, !
+	
+	do INPUT(dirv)
+	do OUTPUT(dirv,filesName)
 	
 	quit
 	
-GET2
-	type literal String ZPGRP = "POLINATEST"
-	type literal String ZPAR = "DIR"
-	//type String val
-		
-	type literal RecordZUTBLPARAM hist = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR")
-		
-	type literal String val = hist.value
+LOADINPROC
 	
-	write "val ",val,!
+	type public Boolean ER = false
+	type String ET = "", RM = ""
+	
+	catch ERR {
+		
+		set ER = 1, RM = ERR.type_", "_ERR.description, ET = ERR.type
+		
+		write !,"Error occurred: "_ET_", "_RM,!
+		
+		if (ERR.type["%GTM-") do ZE^UTLERR
+		
+	}
 	
 	quit
+
+private INITSYS
+
+	do SYSVAR^SCADRV0()
+	set %UserID = 9999
+	set %UserClass = "SCA"
+	set %UserStation = "ZEXTIMPSC"
 	
+	quit	
 	
