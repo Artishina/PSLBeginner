@@ -19,25 +19,7 @@
 	
 	//quit
 	
-	
-
-	//type String ERRMSG = ""
-	
-	// Rollback transaction to avoid TP restarts  
-	//do Runtime.rollback()	
-	
-	//do PROC
-	
-	quit //ERRMSG
-	
-
-	
 TABLEDEL
-
-	//type literal Number ZID = 2
-	//type literal Number ZIDE = 25
-	
-	//do Db.fastDelete("TABLE1","ID=:3,ID=:4")
 	
 	type Number cnt = 0
 	
@@ -58,8 +40,8 @@ OUTPUT(String fileDirectory, String filesName)
 	
 	type IO io = Class.new("IO")
 
-	set io.directory = fileDirectory //"/u01/study/spool"
-	set io.fileName = filesName //"TEST2.LOG"
+	set io.directory = fileDirectory 
+	set io.fileName = filesName 
 	set io.openParams = "NEWV/WRITE"
 	
 	set io.timeout = 5
@@ -164,58 +146,6 @@ INPUT(String fileDirectory)
 	do io.close()
 	
 	quit
-
-Task 
-	type String fileDirectory = "/u01/study/spool"
-	type String filesName = "TEST1.txt"
-	
-	//do INPUT(fileDirectory,filesName)
-	
-	// TEST2.LOG
-		
-	quit
-	
-LOADINPATH	
-	
-	do Runtime.rollback()
-	
-	do INITSYS
-	
-	type literal String EXT = ".LOG"
-	type literal String DefName = "OUTPUT"
-	
-	type public Boolean ERROR = false
-	type public String SCRHDR = "ZPOLINA"
-
-	type String DROPDOWN(), %READ, %TAB(), VFMQ
-	type String fileDirectory,filesName
-	
-	catch ex {
-		set ERROR = true	
-	}
-	
-	set DROPDOWN("/u01/study/spool")="study"
-	set DROPDOWN("/u01/vtbdevnew/spool")="vtbdevnew"
-
-	set %TAB("fileDirectory")="/DES=Enter Directory's name/TYP=T/LEN=200/REQ/TBL=DROPDOWN("
-	set %TAB("filesName")="/DES=Enter File's name/TYP=T/LEN=200/REQ"
-	set %READ="@@%FN,,@SCRHDR/CEN,fileDirectory/REQ,filesName/NOREQ"
-	
-	do ^UTLREAD if ERROR.get() !(VFMQ="Q")
-	
-	write filesName, !
-	write fileDirectory, !
-	
-	//do LOADINPROC(filesName)
-	
-	if filesName.isNull() set filesName = DefName
-	
-	set filesName = filesName_EXT
-		
-	do INPUT(fileDirectory)
-	do OUTPUT(fileDirectory,filesName)
-	
-	quit	
 	
 GET
 
@@ -223,31 +153,37 @@ GET
 	
 	do INITSYS
 		
-	type literal String DefName = "OUTPUT"
 	type literal String DefDir = "/u01/study/spool"
 	type literal String DefExt = "LOG"
 	type literal String ZPGRP = "POLINATEST"
 	type literal String ZPARD = "DIR"
 	type literal String ZPAR = "FILEEXT" 
-		
-	type literal RecordZUTBLPARAM dir = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPARD",1)		
-	
-	#IF 'dir.value.isNull() 
-		type literal String dirv = dir.value
-	#ELSE 
-		type literal String dirv = DefDir
+	type String extv
+	/*		
+	type literal ResultSet zrec = Db.select("PARAMGRP,PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
+  
+  	#while zrec.next() 
 
-	#END
+  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
+	SET extv = zrec.getCol("VALUE")
+    	//type literal String extv = zrec.getCol("VALUE")
+    	//type literal String dirv = zrec.getCol(4)
+    	
+    	#END
+    	*/
+    	type ResultSet zrec = Db.select("PARAMGRP,PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
+  
+  	while zrec.next() do {
 
-	
-	type literal RecordZUTBLPARAM ext = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)		
-	
-	#IF 'ext.value.isNull() 
-		type literal String extv = ext.value
-	#ELSE 
-		type literal String extv = DefExt
-
-	#END
+  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
+	SET extv = zrec.getCol("VALUE")
+    	//type literal String extv = zrec.getCol("VALUE")
+    	//type literal String dirv = zrec.getCol(4)
+    	write "1extv ",extv,!
+  	}
+    
+	write "extv ",extv,!
+	//write "dirv ",extv,!
 	
 	type public String SCRHDR = "ZPOLINA"
 
@@ -255,7 +191,7 @@ GET
 	type String fileDirectory,filesName
 	
 	set fileDirectory = dirv
-	
+		
 	set DROPDOWN(dirv)="study"
 	set DROPDOWN("/u01/vtbdevnew/spool")="vtbdevnew"
 
@@ -265,12 +201,10 @@ GET
 	
 	do ^UTLREAD if ER.get() !(VFMQ="Q")
 	
-	if filesName.isNull() set filesName = DefName
-	
-	set filesName = filesName_"."_extv
-	
+	DO VLDFILE(.filesName,extv)
+
 	do LOADINPROC	
-	
+
 	write "Output file: ",filesName, !
 	write "Directory: ",fileDirectory, !
 	
@@ -295,6 +229,16 @@ LOADINPROC
 	}
 	
 	quit
+	
+VLDFILE(String filesName,String extv)
+
+  	type literal String DefName = "OUTPUT"
+
+  	if filesName.isNull() set filesName = DefName
+  	
+  	set filesName = filesName_"."_extv
+  
+  	quit
 
 private INITSYS
 
@@ -305,3 +249,103 @@ private INITSYS
 	
 	quit	
 	
+TEST 
+
+	type literal String ZPGRP = "POLINATEST"
+	type literal String ZPARD = "DIR"
+	type literal String ZPAR = "FILEEXT" 
+	type String extvn
+	type String array()
+	type Number N=1
+			
+	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
+	//type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
+  
+  	#while zrec.next() 
+	write "arr ",!
+  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
+	//xecute SET extv = zrec.getCol("VALUE")
+	//SET extvn = zrec.getCol("VALUE")
+		set array(N) = zrec.getCol("VALUE")
+		
+		write "arr ",array(N),!
+		set N = N + 1
+	//type literal String extv= zrec.getCol("VALUE")
+    	//type literal String extv = zrec.getCol("VALUE")
+    	//type literal String dirv = zrec.getCol(4)
+    	//write "extv ",extv,!
+    	#END
+    	
+    	//write "arr ",array(1),!
+    	
+    	type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
+    	write "RS ",rs.value,!
+    	
+    	//write "extv ",extv,!
+	quit
+	
+TEST0
+	type ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
+	//type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
+  
+  	while zrec.next() do {
+	write "ggg ",!
+  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
+	//xecute SET extv = zrec.getCol("VALUE")
+	//SET extvn = zrec.getCol("VALUE")
+	type String extv= zrec.getCol("VALUE")
+    	//type literal String extv = zrec.getCol("VALUE")
+    	//type literal String dirv = zrec.getCol(4)
+    	write "extv ",extv,!
+  	}
+
+	quit
+
+TEST1		
+	type String extvn()
+	type Number N=1
+	type literal ResultSet RS = Db.select("GRP","UTBLIACM")
+
+	#while RS.next()
+
+		SET extvn(N) = RS.getCol(1)
+		//type literal String extvn(N) = RS.getCol(1)
+		write N," ",extvn(N),!
+		set N = N + 1
+	#end
+
+	quit 
+
+TEST2		
+	type String extvn()
+	type Number N=1
+	type literal ResultSet RS = Db.select("GRP,IACM","UTBLIACM")
+
+	#while RS.next()
+
+		#IF RS.getCol(1) = "CD"
+		SET extvn(N) = RS.getCol(2)
+		//type literal String extvn(N) = RS.getCol(1)
+		write N," ",extvn(N),!
+		set N = N + 1
+	#end
+
+	quit 
+
+TEST3		
+	type String extvn()
+	type Number N=1
+	type literal ResultSet RS = Db.select("PARAMGRP,VALUE","ZUTBLPARAM")
+
+	#while RS.next()
+
+		#IF RS.getCol("PARAMGRP") = "POLINATEST"
+		SET extvn(N) = RS.getCol(2)
+		//type literal String extvn(N) = RS.getCol(1)
+		write N," ",extvn(N),!
+		set N = N + 1
+	#end
+
+	quit 
+		
+		
