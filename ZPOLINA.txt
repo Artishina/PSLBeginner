@@ -258,15 +258,15 @@ TEST
 	type String array()
 	type Number N=1
 			
-	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
-	//type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
+	//type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
+	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
   
-  	#while zrec.next() 
+  	#WHILE zrec.next() 
 	write "arr ",!
   	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
 	//xecute SET extv = zrec.getCol("VALUE")
 	//SET extvn = zrec.getCol("VALUE")
-		set array(N) = zrec.getCol("VALUE")
+		set array(N) = zrec.getCol(2)
 		
 		write "arr ",array(N),!
 		set N = N + 1
@@ -338,12 +338,33 @@ TEST3
 	type literal ResultSet RS = Db.select("PARAMGRP,VALUE","ZUTBLPARAM")
 
 	#while RS.next()
-
+		/*
 		#IF RS.getCol("PARAMGRP") = "POLINATEST"
 		SET extvn(N) = RS.getCol(2)
 		//type literal String extvn(N) = RS.getCol(1)
 		write N," ",extvn(N),!
 		set N = N + 1
+		*/
+		SET extvn(N) = RS.getCol(1)
+		//type literal String extvn(N) = RS.getCol(1)
+		write N," ",extvn(N),!
+		set N = N + 1
+	#end
+
+	quit 
+	
+TEST4		
+	type String extvn()
+	type Number N=1
+	type literal ResultSet RS = Db.select("PARAMGRP,VALUE","ZUTBLPARAM")
+
+	#while RS.next()
+		
+		if RS.getCol("PARAMGRP") = "POLINATEST" SET extvn(N) = RS.getCol(2)
+		//type literal String extvn(N) = RS.getCol(1)
+		write N," ",extvn(N),!
+		set N = N + 1
+		
 	#end
 
 	quit 
