@@ -152,47 +152,31 @@ GET
 	do Runtime.rollback()
 	
 	do INITSYS
+	
+	type public String SCRHDR = "ZPOLINA"
 		
 	type literal String DefDir = "/u01/study/spool"
 	type literal String DefExt = "LOG"
 	type literal String ZPGRP = "POLINATEST"
 	type literal String ZPARD = "DIR"
 	type literal String ZPAR = "FILEEXT" 
-	type String extv
-	/*		
-	type literal ResultSet zrec = Db.select("PARAMGRP,PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
-  
-  	#while zrec.next() 
-
-  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
-	SET extv = zrec.getCol("VALUE")
-    	//type literal String extv = zrec.getCol("VALUE")
-    	//type literal String dirv = zrec.getCol(4)
-    	
-    	#END
-    	*/
-    	type ResultSet zrec = Db.select("PARAMGRP,PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
-  
-  	while zrec.next() do {
-
-  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
-	SET extv = zrec.getCol("VALUE")
-    	//type literal String extv = zrec.getCol("VALUE")
-    	//type literal String dirv = zrec.getCol(4)
-    	write "1extv ",extv,!
-  	}
-    
-	write "extv ",extv,!
-	//write "dirv ",extv,!
+	type literal String array()
 	
-	type public String SCRHDR = "ZPOLINA"
-
 	type String DROPDOWN(), %READ, %TAB(), VFMQ
 	type String fileDirectory,filesName
 	
-	set fileDirectory = dirv
+	type Number N = 1
+			
+	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
+  
+  	#WHILE zrec.next() 
+		set array(N) = zrec.getCol(2)
+		set N = N + 1
+    	#END
+	
+	set fileDirectory = array(1)
 		
-	set DROPDOWN(dirv)="study"
+	set DROPDOWN(array(1))="study"
 	set DROPDOWN("/u01/vtbdevnew/spool")="vtbdevnew"
 
 	set %TAB("fileDirectory")="/DES=Enter Directory's name/TYP=T/LEN=200/REQ/TBL=DROPDOWN("
@@ -201,15 +185,15 @@ GET
 	
 	do ^UTLREAD if ER.get() !(VFMQ="Q")
 	
-	DO VLDFILE(.filesName,extv)
+	DO VLDFILE(.filesName,array(2))
 
 	do LOADINPROC	
 
 	write "Output file: ",filesName, !
 	write "Directory: ",fileDirectory, !
 	
-	do INPUT(dirv)
-	do OUTPUT(dirv,filesName)
+	do INPUT(array(1))
+	do OUTPUT(array(1),filesName)
 	
 	quit
 	
@@ -300,73 +284,26 @@ TEST0
   	}
 
 	quit
-
-TEST1		
-	type String extvn()
-	type Number N=1
-	type literal ResultSet RS = Db.select("GRP","UTBLIACM")
-
-	#while RS.next()
-
-		SET extvn(N) = RS.getCol(1)
-		//type literal String extvn(N) = RS.getCol(1)
-		write N," ",extvn(N),!
-		set N = N + 1
-	#end
-
-	quit 
-
-TEST2		
-	type String extvn()
-	type Number N=1
-	type literal ResultSet RS = Db.select("GRP,IACM","UTBLIACM")
-
-	#while RS.next()
-
-		#IF RS.getCol(1) = "CD"
-		SET extvn(N) = RS.getCol(2)
-		//type literal String extvn(N) = RS.getCol(1)
-		write N," ",extvn(N),!
-		set N = N + 1
-	#end
-
-	quit 
-
-TEST3		
-	type String extvn()
-	type Number N=1
-	type literal ResultSet RS = Db.select("PARAMGRP,VALUE","ZUTBLPARAM")
-
-	#while RS.next()
-		/*
-		#IF RS.getCol("PARAMGRP") = "POLINATEST"
-		SET extvn(N) = RS.getCol(2)
-		//type literal String extvn(N) = RS.getCol(1)
-		write N," ",extvn(N),!
-		set N = N + 1
-		*/
-		SET extvn(N) = RS.getCol(1)
-		//type literal String extvn(N) = RS.getCol(1)
-		write N," ",extvn(N),!
-		set N = N + 1
-	#end
-
-	quit 
 	
-TEST4		
-	type String extvn()
+TEST5 
+
+	type literal String ZPGRP = "POLINATEST"
+	type literal String ZPARD = "DIR"
+	type literal String ZPAR = "FILEEXT" 
+	type String extvn
+	type literal String array()
 	type Number N=1
-	type literal ResultSet RS = Db.select("PARAMGRP,VALUE","ZUTBLPARAM")
-
-	#while RS.next()
+			
+	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
+  
+  	#WHILE zrec.next() 
+		set array(zrec.getCol(1)) = zrec.getCol(2)
 		
-		if RS.getCol("PARAMGRP") = "POLINATEST" SET extvn(N) = RS.getCol(2)
-		//type literal String extvn(N) = RS.getCol(1)
-		write N," ",extvn(N),!
+		write "2arr ",array(zrec.getCol(1)),!
 		set N = N + 1
-		
-	#end
+    	#END
 
-	quit 
+	quit
+	
 		
 		
