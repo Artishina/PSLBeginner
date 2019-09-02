@@ -157,10 +157,7 @@ GET
 		
 	type literal String DefDir = "/u01/study/spool"
 	type literal String DefExt = "LOG"
-	type literal String ZPGRP = "POLINATEST"
-	type literal String ZPARD = "DIR"
-	type literal String ZPAR = "FILEEXT" 
-	type literal String array()
+	type literal String zparam()
 	
 	type String DROPDOWN(), %READ, %TAB(), VFMQ
 	type String fileDirectory,filesName
@@ -170,13 +167,13 @@ GET
 	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
   
   	#WHILE zrec.next() 
-		set array(N) = zrec.getCol(2)
+		set zparam(N) = zrec.getCol(2)
 		set N = N + 1
     	#END
 	
-	set fileDirectory = array(1)
+	set fileDirectory = zparam(1)
 		
-	set DROPDOWN(array(1))="study"
+	set DROPDOWN(fileDirectory)="study"
 	set DROPDOWN("/u01/vtbdevnew/spool")="vtbdevnew"
 
 	set %TAB("fileDirectory")="/DES=Enter Directory's name/TYP=T/LEN=200/REQ/TBL=DROPDOWN("
@@ -185,15 +182,15 @@ GET
 	
 	do ^UTLREAD if ER.get() !(VFMQ="Q")
 	
-	DO VLDFILE(.filesName,array(2))
+	DO VLDFILE(.filesName,zparam(2))
 
 	do LOADINPROC	
 
 	write "Output file: ",filesName, !
 	write "Directory: ",fileDirectory, !
 	
-	do INPUT(array(1))
-	do OUTPUT(array(1),filesName)
+	do INPUT(fileDirectory)
+	do OUTPUT(fileDirectory,filesName)
 	
 	quit
 	
@@ -233,77 +230,6 @@ private INITSYS
 	
 	quit	
 	
-TEST 
 
-	type literal String ZPGRP = "POLINATEST"
-	type literal String ZPARD = "DIR"
-	type literal String ZPAR = "FILEEXT" 
-	type String extvn
-	type String array()
-	type Number N=1
-			
-	//type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
-	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
-  
-  	#WHILE zrec.next() 
-	write "arr ",!
-  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
-	//xecute SET extv = zrec.getCol("VALUE")
-	//SET extvn = zrec.getCol("VALUE")
-		set array(N) = zrec.getCol(2)
-		
-		write "arr ",array(N),!
-		set N = N + 1
-	//type literal String extv= zrec.getCol("VALUE")
-    	//type literal String extv = zrec.getCol("VALUE")
-    	//type literal String dirv = zrec.getCol(4)
-    	//write "extv ",extv,!
-    	#END
-    	
-    	//write "arr ",array(1),!
-    	
-    	type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
-    	write "RS ",rs.value,!
-    	
-    	//write "extv ",extv,!
-	quit
-	
-TEST0
-	type ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP=:ZPGRP")
-	//type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
-  
-  	while zrec.next() do {
-	write "ggg ",!
-  	//type literal RecordZUTBLPARAM rs = Db.getRecord("ZUTBLPARAM","PARAMGRP=:ZPGRP,PARAM=:ZPAR",1)	
-	//xecute SET extv = zrec.getCol("VALUE")
-	//SET extvn = zrec.getCol("VALUE")
-	type String extv= zrec.getCol("VALUE")
-    	//type literal String extv = zrec.getCol("VALUE")
-    	//type literal String dirv = zrec.getCol(4)
-    	write "extv ",extv,!
-  	}
-
-	quit
-	
-TEST5 
-
-	type literal String ZPGRP = "POLINATEST"
-	type literal String ZPARD = "DIR"
-	type literal String ZPAR = "FILEEXT" 
-	type String extvn
-	type literal String array()
-	type Number N=1
-			
-	type literal ResultSet zrec = Db.select("PARAM,VALUE","ZUTBLPARAM","PARAMGRP='POLINATEST'")
-  
-  	#WHILE zrec.next() 
-		set array(zrec.getCol(1)) = zrec.getCol(2)
-		
-		write "2arr ",array(zrec.getCol(1)),!
-		set N = N + 1
-    	#END
-
-	quit
-	
 		
 		
