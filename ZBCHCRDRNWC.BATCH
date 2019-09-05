@@ -1,0 +1,520 @@
+//DO NOT MODIFY  Debit Card Renewal after Expiry|ZCRDRNWC||||||CRD|EXPDT BETWEEN :MINEXPDT AND :MAXEXPDT AND CRDTYP IN (:CRDRNWCRIT)|10|100|32000|CRDRNWCRIT,SALTRNTYPE,RNWDAY,DELDSTPID|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+	/*
+	 ORIG: Maxim Smolyaninov
+	 DESC: Debit Card Renewal after Expiry
+
+	---- Comments --------------------------------------------------------
+
+	---- Revision History ------------------------------------------------
+	30/05/2019 - Maksim Sokolov - VTB-3111 (CR#1049)
+		Changed ZCRD.ZCODE to be String and deleted ZCODE > 0 check.
+
+	07/05/2019 - Aivar IUsupov - VTB-3086
+		    Restored VTB-2957 code for VTB-2901 for Rel3/19.
+	
+	11/03/2019 - Maksim Markov - VTB-2901 (CR#984)
+		    EXEC section modified to fill newzcrd.ordchannel
+		    with the value of the ZUTBLPARAM-ZCRDRNWC-ORDCHANNEL setting.
+		    
+	22/03/2019 - Dmitry Bazarov - VTB-2957
+		    Modified to run renewal process for salary cards only on specified day.
+
+	10/01/2018 - Dmitry Bazarov - VTB-2696 (CR#916)
+		    Modified to support delivery destination renewal algorithm  (^ZCRDDDRN) 
+		
+	29/11/2018 - Mikhail Davydov - VTB-2676
+		   Changed plastic design selection procedure when 
+		   the card type is switched to the new one.
+		   	
+	25/07/18 - Dmitriy Bazarov - VTB-2509 (CR#861)
+		   EXEC section modified to set newcrd.zboo and newcrd.zcc from dep
+		    if at least one field is empty
+
+	11/12/2017 - Mikhail Davydov - VTB-2196 (CR#754)
+		   Changed plastic design selection procedure.
+		   	
+	11/07/2017 - Akhila Das K M - VTB-1906 (CR#699)
+		   Salary Card Re-issue.
+		   - Added CHKSALDEP section to validate salary card renewal criteria
+		   - Modified EXEC section to call criteria section based on configuration
+		     given in ZUTBLCRDRNW
+
+	21/12/2016 - Maxim Smolyaninov - VTB-1770/CR#458
+		   Created the batch.
+
+	*/
+---------- OPEN    ------ Section marker
+
+	type public Number RNWDAY	//Renewal day of month for salary cards reissue
+	type public Number DELDSTPID	//flying variable from ZCRDDELDSTRNW
+	type public Date MAXEXPDT,MINEXPDT
+	type public String CRDRNWCRIT()
+	type public List SALTRNTYPE
+	type List   CRDTYPLIST
+	type Number RNWOFF,MAXRNWOFF
+	type String ZCRIT,CARDTYPE,ZCTYPERS
+	
+
+	set MAXRNWOFF  = 40 // Default minimum number of days to renew card	
+	set CRDTYPLIST = Class.new("List","")
+	set SALTRNTYPE = Class.new("List","")
+	
+	// Loading settings for CRDTYP
+	type ResultSet rs1=Db.select("CARDTYPE,RNWOFF,ZCTYPERS","CRDTYP")
+	while rs1.next() {
+		// Get maximum RNWOFF value of all CRDTYP 
+		set RNWOFF = rs1.getCol("RNWOFF")
+		if (RNWOFF > MAXRNWOFF) set MAXRNWOFF = RNWOFF
+		
+		// We must process only CRDTYP with assigned ZCTYPERS
+		set ZCTYPERS = rs1.getCol("ZCTYPERS")
+		set CARDTYPE = rs1.getCol("CARDTYPE")
+		if 'ZCTYPERS.isNull() set CRDTYPLIST = CRDTYPLIST.add(CARDTYPE,",")
+	}
+	
+	// Set maximum expiry date
+	set MAXEXPDT = %SystemDate + MAXRNWOFF
+	// Set minimum expiry date 
+	set MINEXPDT = %SystemDate - 1	
+	
+	// Loading selection criteria for each card type to reduce IO
+	type ResultSet rs2=Db.select("CARDTYPE,TRNTYPES,NUMMONTH,NUMOP,STAT,CAT,SALARY,CRITFUNC","ZUTBLCRDRNW")
+	while rs2.next() {
+		set CARDTYPE = rs2.getCol("CARDTYPE")
+
+ 		// Only card in this list shall be processed
+		if 'CRDTYPLIST.contains(CARDTYPE,",",1) quit
+
+		if 'CRDRNWCRIT(CARDTYPE).exists() {
+			set CRDRNWCRIT(CARDTYPE) = ""
+		}
+
+		// Load this data to reduce IO EXEC section
+		type RecordCRDTYP crdtyp=Db.getRecord("CRDTYP","CARDTYPE=:CARDTYPE",1)
+	        if 'crdtyp.getMode() throw Class.new("Error", "ZCRDRNWB-E-INVLDTYP,"_$$^MSG(11008))
+
+		// Get new CRDTYP
+		type String NEWCRDTYP = crdtyp.zctypers
+		type RecordCRDTYP newCrdtyp=Db.getRecord("CRDTYP","CARDTYPE=:NEWCRDTYP",1)
+		if 'newCrdtyp.getMode() throw Class.new("Error", "ZCRDRNWB-E-INVLDTYP,"_$$^MSG(11008))
+
+		type String CRDPL = ""
+		type ResultSet rs3=Db.select("CRDPL","ZUTBLCRDTYPPL","CARDTYPE=:NEWCRDTYP")
+		if rs3.next() set CRDPL=rs3.getCol(1)
+		
+		set ZCRIT = ""
+		set ZCRIT.piece("|", 1) = rs2.getCol("TRNTYPES")
+		set ZCRIT.piece("|", 2) = rs2.getCol("NUMMONTH")
+		set ZCRIT.piece("|", 3) = rs2.getCol("NUMOP")
+		set ZCRIT.piece("|", 4) = rs2.getCol("STAT")
+		set ZCRIT.piece("|", 5) = rs2.getCol("CAT")
+		set ZCRIT.piece("|", 6) = rs2.getCol("SALARY")
+		set ZCRIT.piece("|", 7) = NEWCRDTYP
+		set ZCRIT.piece("|", 8) = newCrdtyp.zcrdcls
+		set ZCRIT.piece("|", 9) = CRDPL
+		set ZCRIT.piece("|",10) = newCrdtyp.term
+		set ZCRIT.piece("|",11) = crdtyp.rnwoff
+		set ZCRIT.piece("|",12) = $select((NEWCRDTYP = CARDTYPE):crdtyp.crdpl, 1:"")
+		set ZCRIT.piece("|",13) = rs2.getCol("CRITFUNC")	// Criteria Section
+		
+		set CRDRNWCRIT(CARDTYPE) = ZCRIT		
+	}
+
+	// Load salary BTCs from ZUTBLTRNTYPE
+	type ResultSet rs3 = Db.select("TRNTYPE", "ZUTBLTRNTYPE", "ZSALNOT = 1")
+	while rs3.next() set SALTRNTYPE = SALTRNTYPE.add(rs3.getCol("TRNTYPE"))
+	
+	//Load the salary cards reissue day of the month
+	type ResultSet rs4 = Db.select( "VALUE", "ZUTBLPARAM", "PARAMGRP = 'ZCRDRNWC' AND PARAM = 'SALCRDRNWDATE'")
+	if rs4.next() set RNWDAY = +rs4.getCol(1)
+	else  set RNWDAY=0
+	if RNWDAY>31 ! RNWDAY<0 set RNWDAY=0
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	type public Number DELDSTPID
+	
+	if DELDSTPID.get().isNull() quit
+	
+	do procCrd2^ZCRDDDRN
+	
+	do logFile^ZCRDDDRN
+	
+	//do clear^ZCRDDDRN
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	type String GRP,ZCRIT,NEWCRDTYP,NEWZCRDCLS,NEWCRDPL,NEWTERM,ORDCHNL
+
+	type public String RM
+	type public Boolean ER
+	type public Number CID,RNWDAY
+
+	type public String CRDRNWCRIT()
+		
+	catch procErr {
+		
+		do Runtime.rollback()
+		
+		set RM = "THROWN: "_procErr.thrownAt_". DESC: "_procErr.description_". CONTEXT: "_procErr.context
+		do EXC
+		
+		if {List}"%FILER,%GTM,%PSL,%SYSTEM".contains(procErr.component) do LOGERR^UTLERR(.procErr) quit		
+	}
+
+	type RecordCRD crd=Db.getRecord("CRD","CRDTYP=:CRDTYP,CRDNUM=:CRDNUM",1)
+	if 'crd.getMode() quit
+	if crd.replace quit // skip already replaced
+
+	type RecordZCRD zcrd=Db.getRecord("ZCRD","CRDTYP=:CRDTYP,CRDNUM=:CRDNUM")
+	if 'zcrd.getMode() quit
+	
+	//Verify the renewal day of month for salary cards
+	//it is prior than CRDRNWCRIT
+	type Number currentDay = +%SystemDate.day()
+	if '(zcrd.zcode.isNull()),RNWDAY>0,('(currentDay=RNWDAY)) quit 
+
+	// Get selection criteria to retrive some cached data for renewed card
+	set ZCRIT = CRDRNWCRIT(CRDTYP)
+	if ZCRIT.get().isNull(1) quit // No selection criteria for this type of card
+
+	// Get linked account
+	set CID=$$GETCID^ZCRDUTL(CRDNUM)
+	if CID.get().isNull() throw Class.new("Error", "ZCRDRNWB-E-INVCID"_$$^MSG(100001))
+
+	type String CRITFUNC = ZCRIT.piece("|", 13)	// Criteria Section
+
+	// If the criteria section is null, then CHKCRD section is called.
+	if CRITFUNC.get().isNull() set CRITFUNC = "CHKCRD"
+	
+	// Check card for selection criteria
+	if '$$@CRITFUNC^ZCRDRNWC(.crd, .zcrd) quit
+
+	set NEWCRDTYP  = ZCRIT.piece("|", 7)
+	set NEWZCRDCLS = ZCRIT.piece("|", 8)
+	set NEWCRDPL   = ZCRIT.piece("|", 9)
+	set NEWTERM    = ZCRIT.piece("|", 10)
+
+	// Get new card number
+	type String NEWCRDNUM=$$ZCRDNUMGN^ZCRDNUMG(NEWCRDTYP,crd.acn,crd.crdnum,1)
+	if ER throw Class.new("Error","ZCRDRNWB-E-INVLNEWCRDNUM,"_$$^MSG(110133,crd.crdnum))
+
+			
+	type RecordDEP dep=Db.getRecord("DEP","CID=:CID",1)
+	if 'dep.getMode() throw Class.new("Error", "ZCRDRNWB-E-INVCID"_$$^MSG(100001))
+
+	// Create new card
+	type RecordCRD rcrd=Class.new("RecordCRD")
+	do rcrd.setMode(0)
+	
+	type RecordZCRD rzcrd=Class.new("RecordZCRD")
+	do rzcrd.setMode(0)
+	
+	set rcrd.crdtyp      = NEWCRDTYP
+	set rcrd.crdnum      = NEWCRDNUM
+	set rcrd.acn         = crd.acn       //required data item for CRD file
+	set rcrd.zcc         = crd.zcc
+
+	set rzcrd.crdtyp     = NEWCRDTYP
+	set rzcrd.crdnum     = NEWCRDNUM	
+
+	if (CRDTYP=NEWCRDTYP) set rzcrd.zcrdcls = zcrd.zcrdcls 
+	else  set rzcrd.zcrdcls = NEWZCRDCLS
+
+	set rzcrd.zcrdcat    = zcrd.zcrdcat
+	set rzcrd.zcrdmode   = zcrd.zcrdmode
+	set rcrd.zcrdpri     = "R"            // New reissue priority
+
+	if '(ZCRIT.piece("|",12).isNull()) set rcrd.crdpl = ZCRIT.piece("|",12)
+	else  set rcrd.crdpl = $$GETCRDPL^MRPC5214(NEWCRDTYP, crd.crdpl)
+	
+	set rcrd.crdhld      = crd.crdhld
+	set rzcrd.zcompnam   = zcrd.zcompnam
+	set rzcrd.zextcifid  = zcrd.zextcifid
+	set rcrd.zlmtplan    = crd.zlmtplan
+	set rzcrd.zaddinf1   = zcrd.zaddinf1
+	set rzcrd.zaddinf2   = zcrd.zaddinf2
+	set rzcrd.zaddinf3   = zcrd.zaddinf3
+	set rzcrd.zdeldst    = zcrd.zdeldst
+	set rzcrd.bonusacn   = zcrd.bonusacn
+
+	set rcrd.isdt        = %SystemDate
+	set rcrd.stat        = CUVAR.ZSTINI
+	set rcrd.zboo        = dep.boo		// Set from DEP, because it can be changed
+	set rcrd.zorgnum     = crd.crdnum 
+	set rzcrd.zcode      = zcrd.zcode
+	set rzcrd.zvpin      = zcrd.zvpin	
+	set rcrd.zreissue    = 1	
+	set rzcrd.zfreewth   = zcrd.zfreewth
+        set rzcrd.zfreewthp  = zcrd.zfreewthp
+        set rzcrd.zfreewthfr = zcrd.zfreewthfr
+        set rzcrd.zfreewthc  = 0
+
+	// Card Order Channel for reissuing cards
+	type literal RecordZUTBLPARAM par = Db.getRecord("ZUTBLPARAM", "PARAMGRP='ZCRDRNWC',PARAM='ORDCHANNEL'", 1)
+	#IF 'par.value.isNull()
+	set ORDCHNL = par.value
+	#ELSE
+	set ORDCHNL = "BACKOFFICE"
+	#ENDIF
+	set rzcrd.ordchannel = ORDCHNL
+
+	// Calculate and set new expiration date
+	set rcrd.expdt      = $$EOMJD^SCADAT(($$EXT^UMDT(NEWTERM,crd.expdt)),1)
+	
+	// Increment or set up renewal card counter
+	if crd.zrnwcount.isNull() set rcrd.zrnwcount=1
+	else  set rcrd.zrnwcount=crd.zrnwcount+1
+
+	//Return Branch Code and Cost Center from Account if Fields Are 
+	//Not Available in the Parent Card Record
+	if rcrd.zcc.isNull() set rcrd.zcc = dep.cc
+		
+	//Link card to account
+	type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+	if 'acn.getMode() throw Class.new("Error", "ZCRDRNWB-E-INVCID"_$$^MSG(100001))
+	set GRP=acn.grp
+			
+	type RecordCRDGRP crdgrp=Class.new("RecordCRDGRP")
+	set crdgrp.crdtyp   = NEWCRDTYP
+	set crdgrp.crdnum   = NEWCRDNUM
+	set crdgrp.grp      = GRP
+	set crdgrp.cid      = CID	
+	
+	// Update "old" card data
+	set crd.replace     = 1
+	set crd.rplcrd      = NEWCRDNUM
+	set crd.rcrddt      = %SystemDate
+
+	do crd.save()
+	do rcrd.save()
+	do rzcrd.save()
+	do crdgrp.save()
+	
+	// skip chkcrd cause rcrd field values determined explicitly
+	//if (crd.zreissue=1),(crd.stat=CUVAR.ZSTINI),(zcrd.zcode > 0),(crd.zcrdpri="R") quit 1
+	if 'rzcrd.zcode.isNull() do procCrd1^ZCRDDDRN(rzcrd)
+
+	quit
+	
+CHKCRD(RecordCRD crd, RecordZCRD zcrd)
+
+	/*
+	 Check card for satisfying selection criteria
+	 
+	 ARGUMENTS:
+	 . crd		Card record		/REQ
+	 . zcrd         Custom card record      /REQ
+	 
+	 RETURNS:
+	 . $$	1: CRD is satisfying selection cirteria
+	 	0: CRD is not satisfying selection cirteria
+	*/	
+	
+	type public String CRDRNWCRIT()
+	
+	type String  ZCRIT,CRDTYP,TRNTYPES,CAT,STAT,CRDNUM,TRNTYPE
+	type List    STATLIST,CATLIST,TRNTYPESLIST
+	type Number  NUMMONTH,NUMOP,ISDNY,CUROP,RNWOFF
+	type Boolean SALARY,STOP,REVFLG
+	type Date    MINOPDT,CALDT
+
+	set CRDTYP = crd.crdtyp
+	set CRDNUM = crd.crdnum
+
+	// Get selection criteria
+	set ZCRIT    = CRDRNWCRIT(CRDTYP)
+	if ZCRIT.get().isNull(1) quit 0 // No selection criteria for this type of card
+	
+	set TRNTYPES = ZCRIT.piece("|", 1)
+	set NUMMONTH = (ZCRIT.piece("|", 2).toNumber()) * (-1)
+	set NUMOP    = ZCRIT.piece("|", 3).toNumber()
+	set STAT     = ZCRIT.piece("|", 4)
+	set CAT      = ZCRIT.piece("|", 5)
+	set SALARY   = ZCRIT.piece("|", 6)
+	set RNWOFF   = ZCRIT.piece("|",11).toNumber()
+	
+	// Check card EXPDT. Do we really need to renew this card?
+	if ((crd.expdt - RNWOFF) > %SystemDate) quit 0
+	
+	// Check card status
+	set STATLIST = Class.new("List", STAT)
+	if (STAT '= "*") & ('STATLIST.contains(crd.stat,",",1)) quit 0
+
+	// Check card category
+	set CATLIST = Class.new("List", CAT)
+	if (CAT '= "*") & ('CATLIST.contains(zcrd.zcrdcat,",",1)) quit 0
+	
+	// Check salary flag
+	if ('SALARY) & ('zcrd.zcode.isNull()) quit 0
+	
+	// Check for active package
+	type String ZPKGID = $$GETPKGID^ZPKGUTL(crd.acn)
+	if ZPKGID.isNull() set ISDNY = 0
+	else  set ISDNY = '$$ISPRDAVL^ZPKGUTL(ZPKGID,"DEBITCARD",CRDTYP)
+	if ISDNY quit 0
+
+	// Check transaction history
+	set TRNTYPESLIST = Class.new("List", TRNTYPES)
+	set STOP = false
+	set CUROP = 0
+	set MINOPDT = $$ADDMJD^SCADAT(%SystemDate,NUMMONTH)
+
+	type ResultSet rs=Db.select("TRNTYPE,REVFLG,CALDT","ZAUTHDTL","CRDNUM=:CRDNUM","AUTHID DESC")
+	while rs.next() { quit:STOP
+		// Except reversed transactions
+		set REVFLG = rs.getCol("REVFLG")
+		if REVFLG quit
+
+		// Check TRNTYPE
+		set TRNTYPE = rs.getCol("TRNTYPE")	
+		if TRNTYPE = "124" quit	
+		if (TRNTYPES '= "*") & ('TRNTYPESLIST.contains(TRNTYPE,",",1)) quit
+		
+		// Check transaction date
+		set CALDT = rs.getCol("CALDT")
+		if CALDT < MINOPDT set STOP=true quit
+		
+		set CUROP = CUROP + 1
+		if CUROP>=NUMOP set STOP = true
+	}
+	if (CUROP < NUMOP) quit 0
+	
+	// All checks is ok 
+	quit 1
+
+CHKSALDEP(RecordCRD crd, RecordZCRD zcrd)
+
+	/*
+	 To check the salary card satisfies the selection criteria
+ 
+	 ARGUMENTS:
+	 . crd			Card record		/REQ
+	 . zcrd         Custom card record      /REQ
+ 
+	 RETURNS:
+	 . $$	1: CRD is satisfying selection cirteria
+	 		0: CRD is not satisfying selection cirteria
+	*/	
+
+	type public String CRDRNWCRIT()
+	type public Number CID
+	type public List SALTRNTYPE
+
+	type Boolean SALARY,STOP
+	type Date MINOPDT, CALDT
+	type Number NUMMONTH, NUMOP, ISDNY, CUROP, RNWOFF
+	type String ZCRIT,CRDTYP,TRNTYPES,CAT,STAT,CRDNUM,TRNTYPE
+
+	set CRDTYP = crd.crdtyp
+	set CRDNUM = crd.crdnum
+
+	// Get selection criteria
+	set ZCRIT = CRDRNWCRIT(CRDTYP)
+	if ZCRIT.get().isNull(1) quit 0 // No selection criteria for this type of card
+
+	set TRNTYPES = ZCRIT.piece("|", 1)
+	set NUMMONTH = (ZCRIT.piece("|", 2).toNumber()) * (-1)
+	set NUMOP = ZCRIT.piece("|", 3).toNumber()
+	set STAT = ZCRIT.piece("|", 4)
+	set CAT = ZCRIT.piece("|", 5)
+	set SALARY = ZCRIT.piece("|", 6)
+	set RNWOFF = ZCRIT.piece("|",11).toNumber()
+
+	// Check card EXPDT. Do we really need to renew this card?
+	if ((crd.expdt - RNWOFF) > %SystemDate) quit 0
+
+	// Check card status
+	type List STATLIST = Class.new("List", STAT)
+	if (STAT '= "*") & ('STATLIST.contains(crd.stat, ",", 1)) quit 0
+
+	// Check card category
+	type List CATLIST = Class.new("List", CAT)
+	if (CAT '= "*") & ('CATLIST.contains(zcrd.zcrdcat, ",", 1)) quit 0
+
+	// Check salary flag
+	if '(SALARY & '(zcrd.zcode.isNull())) quit 0
+
+	// Check for active package
+	type String ZPKGID = $$GETPKGID^ZPKGUTL(crd.acn)
+	if ZPKGID.isNull() set ISDNY = 0
+	else  set ISDNY = '$$ISPRDAVL^ZPKGUTL(ZPKGID, "DEBITCARD", CRDTYP)
+	if ISDNY quit 0
+
+	set MINOPDT = $$ADDMJD^SCADAT(%SystemDate, NUMMONTH)
+
+	// Check transaction history
+	type List TRNTYPESLIST = Class.new("List", TRNTYPES)
+	set STOP = false
+	set CUROP = 0
+
+	type ResultSet rs = Db.select("TRNTYPE,REVFLG,CALDT","ZAUTHDTL","CRDNUM=:CRDNUM","AUTHID DESC")
+	while rs.next() { quit:STOP
+
+		if rs.getCol("REVFLG") quit	// Ignore reversal transaction
+
+		// Check TRNTYPE
+		set TRNTYPE = rs.getCol("TRNTYPE")	
+		if TRNTYPE = "124" quit	
+		if (TRNTYPES '= "*") & ('TRNTYPESLIST.contains(TRNTYPE, ",", 1)) quit
+
+		// Check transaction date
+		set CALDT = rs.getCol("CALDT")
+		if CALDT < MINOPDT set STOP=true quit
+
+		set CUROP = CUROP + 1
+		if CUROP >= NUMOP set STOP = true
+	}
+	if (CUROP >= NUMOP) quit 1
+
+	// Check the account history to verify the salary is credited to the account.
+	type Boolean ZSALNOT = false
+	type ResultSet rs2 = Db.select("ITC1,ITC12,TSO", "HIST", "CID=:CID AND (ETC is NOT NULL) AND TJD > :MINOPDT", "TSEQ DESC")
+
+	while rs2.next() do { quit:ZSALNOT
+
+		if rs2.getCol("ITC1") = 0 quit 	// Ignore debit transaction
+		if rs2.getCol("ITC12") = 1 quit	// Ignore REV transaction
+
+		set TRNTYPE = rs2.getCol("TSO").getSub("ZTRNTYPE", "~", "#")
+
+		if TRNTYPE.isNull() quit
+
+		if SALTRNTYPE.contains(TRNTYPE) set ZSALNOT = true quit
+	}
+
+	if 'ZSALNOT quit 0
+
+	// All checks is ok 
+	quit 1
+
+private EXC	
+
+	/*
+	 Log exceptions to DAYEND
+	*/
+
+	type public String ET, RM, %ZTSEQ
+	type public Number CID
+	
+	if ET.get().isNull() set ET = RM.get()
+	set CID = CID.get()
+	do LOG^UTLEXC($T(+0), "*",, CID, %ZTSEQ.get(), ET.get(), 0)
+	kill ET, %ZTSEQ
+	
+	quit 
+	
+---------- THREXIT ------ Section marker

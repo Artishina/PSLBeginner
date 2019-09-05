@@ -1,0 +1,97 @@
+//DO NOT MODIFY  TEST BATCH|ZPOLIN||||||DEP|STAT=0 AND TYPE=401||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	do INITSYS
+	//type public Number ID = %ProcessID
+	set %BatchExit = 0
+
+---------- SCHINIT ------ Section marker
+	
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	
+	type literal String EOL = (13,10).char()
+	type literal String TAB = 9.char()
+	
+	type public String rec
+	
+	type IO io = Class.new("IO")
+
+	set io.directory = "/u01/study/spool"
+	set io.fileName = "OUT.LOG"
+	set io.openParams = "NEWV/WRITE"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
+		
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+
+	do io.write(rec, EOL)
+
+---------- THRINIT ------ Section marker
+
+	/*
+	type public IO io = Class.new("IO")
+
+	set io.directory = "/u01/study/spool"
+	set io.fileName = "OUT.LOG"
+	set io.openParams = "NEWV/WRITE"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
+		
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+
+	set rec = "Begin"
+	do io.write(rec, EOL)
+	*/
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+	
+	type literal String EOL = (13,10).char()
+	type literal String TAB = 9.char()
+	
+	type public String rec
+
+	set rec = "ProcessID: "_TAB_%ProcessID
+
+	
+private INITSYS
+
+	do SYSVAR^SCADRV0()
+	
+	quit	
+
+---------- THREXIT ------ Section marker
+
+	type literal String EOL = (13,10).char()
+	
+	type public IO io
+
+	do io.write("end",EOL)
+	do io.close()

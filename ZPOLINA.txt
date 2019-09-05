@@ -230,6 +230,70 @@ private INITSYS
 	
 	quit	
 	
+TEST
 
+	type Number ZN
+
+	type ResultSet zrc = Db.select("PID,CID,STAT","DEP","CID BETWEEN 1606 AND 1100000228")
+	
+	while zrc.next() do {
+		
+		type RecordDEP zdep = Db.getRecord("DEP","CID=:zrc.getCol(2)",1)
+		set ZN = zdep.cid
+		
+		write "cid = ",ZN, !
+		
+	}
+	
+	
+	quit
+	
+TEST1
+	
+	
+
+	type String dir = "/u01/study/spool"
+	type String file = "OUT.LOG"
+	
+	do OUTPUT(dir,file)
+	
+	quit
+	
+TEST2
+
+	type literal String EOL = (13,10).char()
+	type literal String TAB = 9.char()
+	
+	type String rec,ZNAME,ZAGE,ZBD,ZCITY
+	type Number ZRECNT,ZRECERR,ZRECEM
+	
+	type IO io = Class.new("IO")
+
+	set io.directory = "/u01/study/spool"
+	set io.fileName = "OUT.LOG"
+	set io.openParams = "NEWV/WRITE"
+	
+	set io.timeout = 5
+	set io.charsetName = "UTF-8"
+	set io.recordSize = 1024
+	
+	do io.open()
+	
+	catch ioxcpt {
+		do io.close()
+		
+     	 	if ioxcpt'["%PSL-E-IO" quit
+     	 	throw ioxcpt
+     	 	write "Open failed: ", ioxcpt.type, !
+	}
+
+	set rec = "FFF"
+	
+	do io.write(rec, EOL)
+	
+	do io.close()
+
+	quit
+	
 		
 		
