@@ -4,10 +4,6 @@
 ---------- OPEN    ------ Section marker
 
 	do SYSVAR^SCADRV0()
-	//type public Number ID = %ProcessID
-	//set %BatchExit = 0
-	
-	//set %BatchExit = 1
 
 ---------- SCHINIT ------ Section marker
 	
@@ -20,7 +16,10 @@
 	type literal String EOL = (13,10).char()
 	type literal String TAB = 9.char()
 	
-	type String rec = "123"
+	type String zkey,zdata
+	type String ZKEY1 = "POLINATEST"
+	
+	type String rec
 	
 	type public IO io = Class.new("IO")
 
@@ -41,8 +40,22 @@
      	 	throw ioxcpt
      	 	write "Open failed: ", ioxcpt.type, !
 	}
-
-	do io.write(rec, EOL)
+	
+	
+	type DbSet ztmp = Db.selectDbSet("ZTMP1","KEY1=:ZKEY1")
+	
+	while ztmp.next() do {
+		
+		type RecordZTMP1 rs = ztmp.getRecord("ZTMP1")
+		
+		set zkey = rs.key1
+		set zdata = rs.data	
+		
+		set rec = "ProcessID"_TAB_zdata
+		
+		do io.write(rec, EOL)
+	
+	}
 	
 	do io.close()
 
@@ -52,15 +65,15 @@
 
 ---------- EXEC    ------ Section marker
 
+	type public Number ZCNT = 0
+
 	type RecordZTMP1 ztmp1 = Class.new("RecordZTMP1")
 	
-	set ztmp1.key1 = "POLINATEST"
+	set ztmp1.key1 = "POLINATEST"_ZCNT.toString()
 	set ztmp1.data = %ProcessID.toString()
 	do ztmp1.bypassSave()	
 	
-	//set ZCOUNT = ZCOUNT + 1	
-
-	quit 
+	set ZCNT = ZCNT + 1	
 
 ---------- THREXIT ------ Section marker
 
