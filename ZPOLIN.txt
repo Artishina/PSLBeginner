@@ -3,9 +3,11 @@
 
 ---------- OPEN    ------ Section marker
 
-	do INITSYS
+	do SYSVAR^SCADRV0()
 	//type public Number ID = %ProcessID
-	set %BatchExit = 0
+	//set %BatchExit = 0
+	
+	//set %BatchExit = 1
 
 ---------- SCHINIT ------ Section marker
 	
@@ -18,33 +20,8 @@
 	type literal String EOL = (13,10).char()
 	type literal String TAB = 9.char()
 	
-	type public String rec
+	type String rec = "123"
 	
-	type IO io = Class.new("IO")
-
-	set io.directory = "/u01/study/spool"
-	set io.fileName = "OUT.LOG"
-	set io.openParams = "NEWV/WRITE"
-	
-	set io.timeout = 5
-	set io.charsetName = "UTF-8"
-	set io.recordSize = 1024
-	
-	do io.open()
-	
-	catch ioxcpt {
-		do io.close()
-		
-     	 	if ioxcpt'["%PSL-E-IO" quit
-     	 	throw ioxcpt
-     	 	write "Open failed: ", ioxcpt.type, !
-	}
-
-	do io.write(rec, EOL)
-
----------- THRINIT ------ Section marker
-
-	/*
 	type public IO io = Class.new("IO")
 
 	set io.directory = "/u01/study/spool"
@@ -65,33 +42,31 @@
      	 	write "Open failed: ", ioxcpt.type, !
 	}
 
-	set rec = "Begin"
 	do io.write(rec, EOL)
-	*/
+	
+	do io.close()
+
+---------- THRINIT ------ Section marker
 
 ---------- THREXEC ------ Section marker
 
 ---------- EXEC    ------ Section marker
-	
-	type literal String EOL = (13,10).char()
-	type literal String TAB = 9.char()
-	
-	type public String rec
 
-	set rec = "ProcessID: "_TAB_%ProcessID
-
+	type RecordZTMP1 ztmp1 = Class.new("RecordZTMP1")
 	
-private INITSYS
-
-	do SYSVAR^SCADRV0()
+	set ztmp1.key1 = "POLINATEST"
+	set ztmp1.data = %ProcessID.toString()
+	do ztmp1.bypassSave()	
 	
-	quit	
+	//set ZCOUNT = ZCOUNT + 1	
+
+	quit 
 
 ---------- THREXIT ------ Section marker
 
-	type literal String EOL = (13,10).char()
+	/*type literal String EOL = (13,10).char()
 	
 	type public IO io
 
 	do io.write("end",EOL)
-	do io.close()
+	do io.close()*/
