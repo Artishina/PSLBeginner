@@ -17,7 +17,7 @@
 	type literal String TAB = 9.char()
 	
 	type String zkey,zdata
-	type String ZKEY1 = "POLINATEST"
+	type String ZDATA = "POLINATEST"
 	
 	type String rec
 	
@@ -42,16 +42,16 @@
 	}
 	
 	
-	type DbSet ztmp = Db.selectDbSet("ZTMP1","KEY1=:ZKEY1")
+	type DbSet ztmp1ds = Db.selectDbSet("ZTMP1","DATA=:ZDATA")
 	
-	while ztmp.next() do {
+	while ztmp1ds.next() do {
 		
-		type RecordZTMP1 rs = ztmp.getRecord("ZTMP1")
+		type RecordZTMP1 ztmp1 = ztmp1ds.getRecord("ZTMP1")
 		
-		set zkey = rs.key1
-		set zdata = rs.data	
+		set zkey = ztmp1.key1
+		set zdata = ztmp1.data	
 		
-		set rec = "ProcessID"_TAB_zdata
+		set rec = "ProcessID"_TAB_zkey
 		
 		do io.write(rec, EOL)
 	
@@ -61,19 +61,59 @@
 
 ---------- THRINIT ------ Section marker
 
+	type public Number a = %ProcessID
+
 ---------- THREXEC ------ Section marker
 
 ---------- EXEC    ------ Section marker
 
-	type public Number ZCNT = 0
+	//type public Number ZCNT = 0
+	
+	type literal String EOL = (13,10).char()
+	
+	type IO iolog = Class.new("IO")
+	set iolog.fileName = "test2.LOG"
+	set iolog.directory = "/u01/study/spool"
+	set iolog.openParams = "WRITE"
 
 	type RecordZTMP1 ztmp1 = Class.new("RecordZTMP1")
 	
-	set ztmp1.key1 = "POLINATEST"_ZCNT.toString()
-	set ztmp1.data = %ProcessID.toString()
+	set ztmp1.key1= a
+	set ztmp1.data = "POLINATEST" //_ZCNT.toString()
 	do ztmp1.bypassSave()	
 	
-	set ZCNT = ZCNT + 1	
+	do iolog.open()
+	do iolog.write(%ProcessID,EOL)
+	do iolog.close()
+	
+	//set ZCNT = ZCNT + 1
+	
+	quit
+	
+TEST	
+	type Number cid
+	type Number stat
+	type Number cnt = 0
+	
+	type DbSet zdep = Db.selectDbSet("DEP","STAT=:STAT")
+	
+	while zdep.next() do {
+		type RecordDEP rc = zdep.getRecord("DEP")
+		set cid = rc.cid
+		set stat = rc.stat
+		
+		set cnt = cnt + 1
+	
+		write cnt," ",stat," ",cid,!
+	}
+	
+	quit
+	
+DEL
+	do Db.delete("ZTMP1", "DATA = 'POLINATEST'")
+	
+	quit
+	
 
 ---------- THREXIT ------ Section marker
 
